@@ -40,8 +40,11 @@ export class DiscordService extends BasePlatformService {
     this.client.on('messageCreate', (msg) => this.handleMessage(msg));
     this.client.on('interactionCreate', async (interaction) => {
       if (!interaction.isButton()) return;
+
       if (interaction.customId.startsWith('report_token:')) {
         await this.handleReportButton(interaction);
+      } else if (interaction.customId.startsWith('check_token:')) {
+        await this.handleCheckButton(interaction);
       }
     });
     this.client.login(token).catch((err) => this.logger.error(err));
@@ -246,6 +249,23 @@ export class DiscordService extends BasePlatformService {
       this.logger.error('Error processing report button', err);
       await interaction.editReply(
         'An error occurred while reporting the token.',
+      );
+    }
+  }
+
+  private async handleCheckButton(interaction: ButtonInteraction) {
+    try {
+      const mintAddress = interaction.customId.split(':')[1];
+
+      await interaction.deferReply();
+      const report = await this.rugcheckService.getTokenReport(mintAddress);
+      const { embed, components } = formatRiskReport(mintAddress, report);
+
+      await interaction.editReply({ embeds: [embed], components });
+    } catch (err) {
+      this.logger.error('Error processing check button', err);
+      await interaction.editReply(
+        'An error occurred while checking the token.',
       );
     }
   }
