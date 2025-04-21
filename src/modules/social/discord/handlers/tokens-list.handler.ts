@@ -61,12 +61,24 @@ export function formatTokensList(
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(`check_token:${token.mint}`)
-        .setLabel(`Check ${'symbol' in token ? token.symbol : 'Token'}`)
+        .setLabel(
+          `Check ${
+            ('symbol' in token && token.symbol) ||
+            ('metadata' in token && token.metadata.symbol) ||
+            `${token.mint.slice(0, 6)}...`
+          }`,
+        )
         .setStyle(ButtonStyle.Primary)
         .setEmoji('📊'),
       new ButtonBuilder()
         .setCustomId(`report_token:${token.mint}`)
-        .setLabel('Report')
+        .setLabel(
+          `Report ${
+            ('symbol' in token && token.symbol) ||
+            ('metadata' in token && token.metadata.symbol) ||
+            `${token.mint.slice(0, 6)}...`
+          }`,
+        )
         .setStyle(ButtonStyle.Danger)
         .setEmoji('🚨'),
     ),
@@ -74,7 +86,7 @@ export function formatTokensList(
 
   if (tokens.length > 5) {
     embed.setFooter({
-      text: `Showing actions for first 5 tokens out of ${tokens.length}. Use !check <token> to analyze other tokens.`,
+      text: `Showing actions for first 5 tokens out of ${tokens.length}. Use !check <token> or !report <token> to analyze or report other tokens.`,
     });
   }
 
