@@ -1,57 +1,60 @@
 import { Logger } from '@nestjs/common';
 import { Context } from 'telegraf';
-import { Message } from 'telegraf/typings/core/types/typegram';
 
 export class LoadingMessage {
-  private message: Message.TextMessage | null = null;
-  private interval: NodeJS.Timeout | null = null;
+  private message: any;
+  private dots = 0;
+  private interval: NodeJS.Timeout;
+  private baseText: string;
   private readonly logger = new Logger('LoadingMessage');
-  private readonly emojis = ['🔄', '⏳', '📊', '🔎'];
-  private emojiIndex = 0;
 
   constructor(private readonly ctx: Context) {}
 
-  async start(initialText: string = 'Processing...'): Promise<void> {
-    try {
-      this.message = (await this.ctx.reply(
-        `${this.emojis[0]} ${initialText}`,
-      )) as Message.TextMessage;
+  async start(text: string): Promise<void> {
+    this.baseText = text;
+    this.message = await this.ctx.reply(this.baseText);
 
-      this.interval = setInterval(async () => {
-        try {
-          this.emojiIndex = (this.emojiIndex + 1) % this.emojis.length;
+    this.interval = setInterval(async () => {
+      this.dots = (this.dots + 1) % 4;
+      const newText = this.baseText + '.'.repeat(this.dots);
+
+      try {
+        // Only update if text has changed
+        if (this.message?.text !== newText) {
           await this.ctx.telegram.editMessageText(
-            this.message!.chat.id,
-            this.message!.message_id,
+            this.message.chat.id,
+            this.message.message_id,
             undefined,
-            `${this.emojis[this.emojiIndex]} ${initialText}`,
+            newText,
           );
-        } catch (e) {
-          this.logger.error('Failed to update loading message', e);
-          // Ignore animation update errors
         }
-      }, 1000);
-    } catch (e) {
-      this.logger.error('Failed to start loading message', e);
-    }
+      } catch (error) {
+        // Ignore edit conflicts
+        if (
+          !error.message?.includes('message is not modified') &&
+          !error.message?.includes('message to edit not found')
+        ) {
+          this.logger.error('Error updating loading message:', error);
+        }
+      }
+    }, 500);
   }
 
   async stop(): Promise<void> {
     if (this.interval) {
       clearInterval(this.interval);
-      this.interval = null;
     }
 
-    if (this.message) {
-      try {
+    try {
+      if (this.message) {
         await this.ctx.telegram.deleteMessage(
           this.message.chat.id,
           this.message.message_id,
         );
-      } catch (e) {
-        this.logger.error('Failed to delete loading message', e);
+        this.message = null;
       }
-      this.message = null;
+    } catch (error) {
+      this.logger.error('Error cleaning up loading message:', error);
     }
   }
 }

@@ -1,81 +1,47 @@
+import { GoogleGenAI } from '@google/genai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
-import { AnalyzeResult } from './dto/analyze-message.dto';
+import { RugCheckTokenReport } from 'src/common/interfaces/rugcheck';
 
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
-  private readonly openai: OpenAI;
-  private readonly model = this.config.get<string>('XAI_MODEL') || 'grok-beta';
+  private readonly genAI: GoogleGenAI;
+  private readonly model: string;
+  private readonly temperature = 0.7;
 
   constructor(private readonly config: ConfigService) {
-    this.openai = new OpenAI({
-      apiKey: this.config.getOrThrow<string>('XAI_API_KEY'),
-      baseURL: this.config.get<string>('XAI_BASE_URL') || 'https://api.x.ai/v1',
-    });
+    const apiKey = this.config.getOrThrow<string>('GOOGLE_AI_API_KEY');
+    this.model =
+      this.config.get<string>('GOOGLE_AI_MODEL') || 'gemini-2.0-flash';
+    this.genAI = new GoogleGenAI({ apiKey });
   }
 
-  private getSystemPrompt(): string {
-    return (
-      `You are a helpful assistant specialized in parsing cryptocurrency token references. ` +
-      `When given a user message, extract the token mint address if present, or the token name. ` +
-      `If the mint address is not directly provided, search intelligently for possible token name matches. ` +
-      `Return your result as valid JSON ONLY, with the exact schema:` +
-      ` { "mintAddress": string|null, "name": string|null, "possibleMatches": [{ "name": string, "mintAddress": string }] }.`
-    );
-  }
-
-  private formatUserMessage(message: string): string {
-    return `Message: "${message.replace(/"/g, '\\"')}"`;
-  }
-
-  /**
-   * Analyze an incoming message to extract token information.
-   * Instructs Grok to return a strict JSON with:
-   * {
-   *   mintAddress: string|null,
-   *   name: string|null,
-   *   possibleMatches: Array<{ name: string; mintAddress: string }>
-   * }
-   */
-  async analyzeMessage(message: string): Promise<AnalyzeResult> {
+  async analyzeTokenRisks(report: RugCheckTokenReport): Promise<string> {
     try {
-      const completion = await this.openai.chat.completions.create({
+      const prompt = `As a crypto security expert, analyze this Solana token's risk report and provide a brief recommendation (2-3 sentences max):
+      - Token: ${report.tokenMeta.name} (${report.tokenMeta.symbol})
+      - Risk Score: ${report.score_normalised}/100
+      - Verification: ${report.verification?.jup_verified ? 'Verified' : 'Unverified'}
+      - Price: $${report.price}
+      - Total Holders: ${report.totalHolders}
+      - Total Liquidity: $${report.totalMarketLiquidity}
+      - Risks: ${report.risks.map((r) => `${r.name} (${r.level})`).join(', ')}`;
+
+      const response = await this.genAI.models.generateContent({
         model: this.model,
-        messages: [
-          { role: 'system', content: this.getSystemPrompt() },
-          { role: 'user', content: this.formatUserMessage(message) },
-        ],
-        temperature: 0,
+        contents: [prompt],
+        config: {
+          temperature: this.temperature,
+          maxOutputTokens: 100,
+        },
       });
+      const text = await response.text;
 
-      const raw = completion.choices?.[0]?.message?.content;
-      if (!raw) {
-        this.logger.warn('Empty response from Grok');
-        return { mintAddress: null, name: null, possibleMatches: [] };
-      }
-
-      // Parse the JSON response
-      let parsed: AnalyzeResult;
-      try {
-        parsed = JSON.parse(raw) as AnalyzeResult;
-      } catch (err) {
-        this.logger.error('Failed to parse Grok response as JSON', err);
-        return { mintAddress: null, name: null, possibleMatches: [] };
-      }
-
-      // Ensure fallback structure
-      return {
-        mintAddress: parsed.mintAddress ?? null,
-        name: parsed.name ?? null,
-        possibleMatches: Array.isArray(parsed.possibleMatches)
-          ? parsed.possibleMatches
-          : [],
-      };
+      return text || 'Unable to generate AI insights at this time.';
     } catch (error) {
-      this.logger.error('Grok API call failed', error);
-      return { mintAddress: null, name: null, possibleMatches: [] };
+      this.logger.error('Error generating AI insights:', error);
+      return 'Unable to generate AI insights at this time.';
     }
   }
 }
