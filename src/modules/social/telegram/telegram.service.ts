@@ -1,13 +1,13 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Context, Telegraf } from 'telegraf';
+import { ReplyParameters } from 'telegraf/typings/core/types/typegram';
 import { AiService } from '../../ai/ai.service';
 import { RugcheckService } from '../../rugcheck/rugcheck.service';
 import { BasePlatformService } from '../base/base.service';
 import { formatTelegramReport } from './handlers/message.handler';
 import { formatTokensList } from './handlers/tokens-list.handler';
 import { LoadingMessage } from './utils/loading.util';
-import { ReplyParameters } from 'telegraf/typings/core/types/typegram';
 
 @Injectable()
 export class TelegramService
@@ -70,14 +70,27 @@ export class TelegramService
     const loading = new LoadingMessage(ctx);
     try {
       let mintAddress = '';
+      let replyParams;
 
-      // Handle both command and callback
-      if ('match' in ctx) {
-        mintAddress = (ctx as any).match[1];
+      // Handle both command and callback contexts
+      if (
+        ctx.callbackQuery &&
+        'data' in ctx.callbackQuery &&
+        ctx.callbackQuery.data
+      ) {
+        mintAddress = ctx.callbackQuery.data.split(':')[1];
         await ctx.answerCbQuery('Analyzing token...');
-      } else {
-        const msg = (ctx.message as any)?.text || '';
+        replyParams = {
+          message_id: ctx.callbackQuery.message.message_id,
+          chat_id: ctx.callbackQuery.message.chat.id,
+        };
+      } else if (ctx.message && 'text' in ctx.message) {
+        const msg = ctx.message.text;
         mintAddress = msg.replace(/\/check\s*/, '');
+        replyParams = {
+          message_id: ctx.message.message_id,
+          chat_id: ctx.message.chat.id,
+        };
       }
 
       if (!mintAddress) {
@@ -88,14 +101,15 @@ export class TelegramService
 
       await loading.start('Analyzing token security...');
       const report = await this.rugcheckService.getTokenReport(mintAddress);
+      const aiInsights = await this.aiService.analyzeTokenRisks(report);
       await loading.stop();
 
-      const { text, reply_markup } = formatTelegramReport(mintAddress, report);
+      const { text, reply_markup } = formatTelegramReport(
+        mintAddress,
+        report,
+        aiInsights,
+      );
 
-      const replyParams = {
-        message_id: ctx.message?.message_id,
-        chat_id: ctx.message?.chat.id,
-      };
       return ctx.replyWithPhoto(report.fileMeta?.image, {
         caption: text,
         parse_mode: 'MarkdownV2',

@@ -9,6 +9,7 @@ import { RugCheckTokenReport } from 'src/common/interfaces/rugcheck';
 export function formatRiskReport(
   tokenLabel: string,
   report: RugCheckTokenReport,
+  aiInsights?: string,
 ): { embed: EmbedBuilder; components: ActionRowBuilder<ButtonBuilder>[] } {
   const verificationStatus = {
     name: '🔒 Verification',
@@ -75,6 +76,13 @@ export function formatRiskReport(
   if (report.fileMeta?.image) {
     embed.setThumbnail(report.fileMeta.image);
     embed.setImage(report.fileMeta.image);
+  }
+
+  if (aiInsights) {
+    embed.addFields({
+      name: '🤖 AI Insights',
+      value: `${aiInsights}\n\n*Disclaimer: AI insights are generated automatically and should be taken with a grain of salt. Always DYOR.*`,
+    });
   }
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

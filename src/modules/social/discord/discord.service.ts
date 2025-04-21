@@ -99,9 +99,11 @@ export class DiscordService extends BasePlatformService {
       const name = '';
 
       const report = await this.rugcheckService.getTokenReport(mintAddress);
+      const aiInsights = await this.aiService.analyzeTokenRisks(report);
       const { embed, components } = formatRiskReport(
         name || mintAddress,
         report,
+        aiInsights,
       );
       return this.reply(msg.reply.bind(msg), { embeds: [embed], components });
     } catch (err) {
@@ -259,7 +261,12 @@ export class DiscordService extends BasePlatformService {
 
       await interaction.deferReply();
       const report = await this.rugcheckService.getTokenReport(mintAddress);
-      const { embed, components } = formatRiskReport(mintAddress, report);
+      const aiInsights = await this.aiService.analyzeTokenRisks(report);
+      const { embed, components } = formatRiskReport(
+        mintAddress,
+        report,
+        aiInsights,
+      );
 
       await interaction.editReply({ embeds: [embed], components });
     } catch (err) {

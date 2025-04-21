@@ -8,6 +8,7 @@ function escapeMarkdown(text: string): string {
 export function formatTelegramReport(
   tokenLabel: string,
   report: RugCheckTokenReport,
+  aiInsights?: string,
 ): { text: string; reply_markup: InlineKeyboardMarkup } {
   const riskList =
     report.risks
@@ -55,7 +56,13 @@ export function formatTelegramReport(
     `🚨 *Risk Factors*\n${riskList}\n\n` +
     `📊 *Market Info*\n` +
     `├ LP Providers: ${escapeMarkdown(report.totalLPProviders.toLocaleString())}\n` +
-    `└ Transfer Fee: ${report.transferFee.pct > 0 ? '⚠️' : '✅'} ${escapeMarkdown(report.transferFee.pct.toString())}%`;
+    `└ Transfer Fee: ${report.transferFee.pct > 0 ? '⚠️' : '✅'} ${escapeMarkdown(report.transferFee.pct.toString())}%` +
+    `${
+      aiInsights
+        ? `\n\n🤖 *AI Insights*\n${escapeMarkdown(aiInsights)}\n\n` +
+          `_Disclaimer: AI insights are generated automatically and should be taken with a grain of salt\\. Always DYOR\\._`
+        : ''
+    }`;
 
   const keyboard: InlineKeyboardMarkup = {
     inline_keyboard: [
