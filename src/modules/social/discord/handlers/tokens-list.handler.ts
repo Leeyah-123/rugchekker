@@ -1,0 +1,82 @@
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+} from 'discord.js';
+import {
+  RecentToken,
+  TokenStat,
+  TrendingToken,
+  VerifiedToken,
+} from 'src/common/interfaces/rugcheck';
+
+type TokenListType =
+  | TokenStat[]
+  | RecentToken[]
+  | TrendingToken[]
+  | VerifiedToken[];
+
+function formatTokenDescription(
+  token: TokenStat | RecentToken | TrendingToken | VerifiedToken,
+): string {
+  if ('createAt' in token) {
+    // TokenStat
+    return `**${token.symbol}**\nMint: \`${token.mint}\`\nCreated: ${new Date(token.createAt).toLocaleString()}`;
+  } else if ('metadata' in token) {
+    // RecentToken
+    return `**${token.metadata.symbol}**\nMint: \`${token.mint}\`\nVisits: ${token.visits}\nScore: ${token.score}`;
+  } else if ('up_count' in token) {
+    // TrendingToken
+    return `**Token**\nMint: \`${token.mint}\`\nUpvotes: ${token.up_count}\nTotal Votes: ${token.vote_count}`;
+  } else {
+    // VerifiedToken
+    const links = token.links
+      .map((link) => `[${link.provider}](${link.value})`)
+      .join(', ');
+    return `**${token.symbol}**\nMint: \`${token.mint}\`\n${token.jup_verified ? '✅ Verified' : '❌ Unverified'}${links ? `\nLinks: ${links}` : ''}`;
+  }
+}
+
+export function formatTokensList(
+  title: string,
+  tokens: TokenListType,
+): {
+  embed: EmbedBuilder;
+  components: ActionRowBuilder<ButtonBuilder>[];
+} {
+  const embed = new EmbedBuilder()
+    .setTitle(title)
+    .setDescription(
+      tokens
+        .slice(0, 10)
+        .map((token, index) => `${index + 1}. ${formatTokenDescription(token)}`)
+        .join('\n\n'),
+    )
+    .setColor(0x4a90e2)
+    .setTimestamp();
+
+  // Create action rows for first 5 tokens only (Discord limit)
+  const components = tokens.slice(0, 5).map((token) =>
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`check_token:${token.mint}`)
+        .setLabel(`Check ${'symbol' in token ? token.symbol : 'Token'}`)
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('📊'),
+      new ButtonBuilder()
+        .setCustomId(`report_token:${token.mint}`)
+        .setLabel('Report')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🚨'),
+    ),
+  );
+
+  if (tokens.length > 5) {
+    embed.setFooter({
+      text: `Showing actions for first 5 tokens out of ${tokens.length}. Use !check <token> to analyze other tokens.`,
+    });
+  }
+
+  return { embed, components };
+}
