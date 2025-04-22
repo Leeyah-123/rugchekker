@@ -86,7 +86,7 @@ describe('TelegramService', () => {
       replyWithPhoto: jest.fn(),
       answerCbQuery: jest.fn(),
       message: {
-        text: '/check test-mint',
+        text: '/analyze test-mint',
         message_id: 1,
         chat: { id: 123 },
       },
@@ -96,8 +96,8 @@ describe('TelegramService', () => {
       jest.clearAllMocks();
     });
 
-    it('should handle check command', async () => {
-      await service['handleCheck'](mockContext as any);
+    it('should handle analyze command', async () => {
+      await service['handleAnalyze'](mockContext as any);
 
       expect(rugcheckService.getTokenReport).toHaveBeenCalledWith('test-mint');
       expect(mockContext.replyWithPhoto).toHaveBeenCalled();
@@ -127,7 +127,7 @@ describe('TelegramService', () => {
   describe('error handling', () => {
     const mockContext = {
       reply: jest.fn(),
-      message: { text: '/check invalid' },
+      message: { text: '/analyze invalid' },
     };
 
     it('should handle API errors gracefully', async () => {
@@ -135,7 +135,7 @@ describe('TelegramService', () => {
         .spyOn(rugcheckService, 'getTokenReport')
         .mockRejectedValue(new Error());
 
-      await service['handleCheck'](mockContext as any);
+      await service['handleAnalyze'](mockContext as any);
 
       expect(mockContext.reply).toHaveBeenCalledWith(
         expect.stringContaining('error occurred'),

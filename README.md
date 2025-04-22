@@ -14,8 +14,9 @@ A social media bot for analyzing Solana tokens and detecting potential risks bef
 
 ### Discord
 
-- `!check <token>` - Get a detailed risk report
-- `!report <token>` - Report a suspicious token
+- `!analyze <token>` - Get a detailed risk report on a token.
+- `!report <token> <reason> [Attach document as evidence (Optional)]` - Report a suspicious token
+- `!creator <creator>` - Get a report on a token creator
 - `!new_tokens` - View recently created tokens
 - `!recent` - View most viewed tokens
 - `!trending` - View trending tokens
@@ -24,8 +25,9 @@ A social media bot for analyzing Solana tokens and detecting potential risks bef
 
 ### Telegram
 
-- `/check <token>` - Get a detailed risk report
-- `/report <token>` - Report a suspicious token
+- `/analyze <token>` - Get a detailed risk report
+- `/report <token> <reason> [Attach document as evidence (Optional)]` - Report a suspicious token
+- `/creator <creator>` - Get a report on a token creator
 - `/new_tokens` - View recently created tokens
 - `/recent` - View most viewed tokens
 - `/trending` - View trending tokens

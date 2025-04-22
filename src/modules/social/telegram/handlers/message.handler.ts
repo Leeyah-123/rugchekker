@@ -42,12 +42,16 @@ export function formatTelegramReport(
       }`
     : '❓ Verification status unknown';
 
-  const text =
+  let text =
     `🔍 *Risk Report for ${escapeMarkdown(tokenLabel)}*\n\n` +
     `💎 *Token Info*\n` +
     `├ Name: ${escapeMarkdown(report.tokenMeta.name)}\n` +
     `├ Symbol: ${escapeMarkdown(report.tokenMeta.symbol)}\n` +
     `├ Price: $${escapeMarkdown(report.price.toFixed(4))}\n` +
+    `├ Creator: ${report.creator ? `[${escapeMarkdown(report.creator)}](https://solscan.io/account/${report.creator})` : 'Unknown'}\n` +
+    `├ Program: [${escapeMarkdown(report.tokenProgram)}](https://solscan.io/account/${report.tokenProgram})\n` +
+    `└ Token Address: [${escapeMarkdown(report.mint)}](https://solscan.io/token/${report.mint})\n\n` +
+    `📈 *Market Metrics*\n` +
     `├ Total Holders: ${escapeMarkdown(report.totalHolders.toLocaleString())}\n` +
     `└ Total Liquidity: $${escapeMarkdown(report.totalMarketLiquidity.toLocaleString(undefined, { maximumFractionDigits: 2 }))}\n\n` +
     `⚠️ *Risk Assessment*\n` +
@@ -56,16 +60,41 @@ export function formatTelegramReport(
     `🚨 *Risk Factors*\n${riskList}\n\n` +
     `📊 *Market Info*\n` +
     `├ LP Providers: ${escapeMarkdown(report.totalLPProviders.toLocaleString())}\n` +
-    `└ Transfer Fee: ${report.transferFee.pct > 0 ? '⚠️' : '✅'} ${escapeMarkdown(report.transferFee.pct.toString())}%` +
-    `${
-      aiInsights
-        ? `\n\n🤖 *AI Insights*\n${escapeMarkdown(aiInsights)}\n\n` +
-          `_Disclaimer: AI insights are generated automatically and should be taken with a grain of salt\\. Always DYOR\\._`
-        : ''
-    }`;
+    `└ Transfer Fee: ${report.transferFee.pct > 0 ? '⚠️' : '✅'} ${escapeMarkdown(report.transferFee.pct.toString())}%`;
+
+  // Add community reports section
+  if (report.communityReports) {
+    text +=
+      '\n\n*🚨 Community Reports*\n' +
+      `├ Token Reports: ${report.communityReports.tokenReports}\n` +
+      `└ Creator Reports: ${report.communityReports.creatorReports}`;
+
+    if (report.communityReports.reports.length > 0) {
+      text +=
+        '\n\n*Recent Reports:*\n' +
+        report.communityReports.reports
+          .slice(0, 3)
+          .map((r) => `• ${escapeMarkdown(r.message)}`)
+          .join('\n');
+    }
+  }
+
+  // Add AI insights if available
+  if (aiInsights) {
+    text +=
+      '\n\n*🤖 AI Insights*\n' +
+      escapeMarkdown(aiInsights) +
+      '\n\n_Disclaimer: AI insights are generated automatically and should be taken with a grain of salt\\. Always DYOR\\._';
+  }
 
   const keyboard: InlineKeyboardMarkup = {
     inline_keyboard: [
+      [
+        {
+          text: '👤 Check Creator',
+          callback_data: `check_creator:${report.creator || 'unknown'}`,
+        },
+      ],
       [
         {
           text: '🚨 Report Token',

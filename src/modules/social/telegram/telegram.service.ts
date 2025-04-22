@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Context, Telegraf } from 'telegraf';
-import { ReplyParameters } from 'telegraf/typings/core/types/typegram';
+import { Message, ReplyParameters } from 'telegraf/typings/core/types/typegram';
 import { AiService } from '../../ai/ai.service';
 import { RugcheckService } from '../../rugcheck/rugcheck.service';
 import { BasePlatformService } from '../base/base.service';
@@ -30,13 +30,12 @@ export class TelegramService
 
     // Register command handlers
     this.bot.start((ctx) =>
-      ctx.reply('Welcome! Use /check <token> to get a risk report.'),
+      ctx.reply('Welcome! Use /analyze <token> to get a risk report.'),
     );
-    this.bot.command('check', (ctx) => this.handleCheck(ctx));
 
-    // Add callback query handlers for both report and check buttons
-    this.bot.action(/^report_token:(.+)$/, (ctx) => this.handleReport(ctx));
-    this.bot.action(/^check_token:(.+)$/, (ctx) => this.handleCheck(ctx));
+    // Add analyze command and callback handler
+    this.bot.command('analyze', (ctx) => this.handleAnalyze(ctx));
+    this.bot.action(/^analyze_token:(.+)$/, (ctx) => this.handleAnalyze(ctx));
 
     // Add report command and callback handler
     this.bot.command('report', (ctx) => this.handleReport(ctx));
@@ -48,6 +47,20 @@ export class TelegramService
     this.bot.command('recent', (ctx) => this.handleRecent(ctx));
     this.bot.command('trending', (ctx) => this.handleTrending(ctx));
     this.bot.command('verified', (ctx) => this.handleVerified(ctx));
+
+    // Add creator command and callback handler
+    this.bot.command('creator', (ctx) => this.handleCreatorCommand(ctx));
+    this.bot.action(/^check_creator:(.+)$/, (ctx) =>
+      this.handleCreatorCommand(ctx),
+    );
+
+    // Add photo message handler
+    this.bot.on('photo', (ctx) => {
+      const caption = ctx.message?.caption;
+      if (caption?.startsWith('/report')) {
+        return this.handleReport(ctx);
+      }
+    });
 
     this.logger.log('Telegram bot launched (polling mode)');
   }
@@ -66,11 +79,11 @@ export class TelegramService
     this.logger.warn('onMessage() called but this service is in polling mode');
   }
 
-  private async handleCheck(ctx: Context) {
+  private async handleAnalyze(ctx: Context) {
     const loading = new LoadingMessage(ctx);
     try {
       let mintAddress = '';
-      let replyParams;
+      let replyParams: ReplyParameters | undefined;
 
       // Handle both command and callback contexts
       if (
@@ -86,7 +99,7 @@ export class TelegramService
         };
       } else if (ctx.message && 'text' in ctx.message) {
         const msg = ctx.message.text;
-        mintAddress = msg.replace(/\/check\s*/, '');
+        mintAddress = msg.replace(/\/analyze\s*/, '');
         replyParams = {
           message_id: ctx.message.message_id,
           chat_id: ctx.message.chat.id,
@@ -95,7 +108,7 @@ export class TelegramService
 
       if (!mintAddress) {
         return ctx.reply(
-          'Invalid command. Usage: /check <token>\nExample: /check JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
+          'Invalid command. Usage: /analyze <token>\nExample: /analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
         );
       }
 
@@ -118,42 +131,107 @@ export class TelegramService
       });
     } catch (err) {
       await loading.stop();
-      this.logger.error('Error processing check command/callback', err);
+      this.logger.error('Error processing analyze command/callback', err);
       return ctx.reply('An error occurred while processing your request.');
     }
   }
 
-  private async handleReport(ctx: Context) {
+  private async getFileUrl(fileId: string): Promise<string> {
     try {
-      let mintAddress = '';
-      let replyParams: ReplyParameters;
+      const file = await this.bot.telegram.getFile(fileId);
+      if (!file.file_path) {
+        throw new Error('No file path returned');
+      }
+      const token = this.config.getOrThrow<string>('TELEGRAM_BOT_TOKEN');
+      return `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+    } catch (err) {
+      this.logger.error('Error getting file URL', err);
+      throw new Error('Failed to get file URL');
+    }
+  }
 
-      // Handle both command and callback
-      if ('match' in ctx) {
-        mintAddress = ctx.match[1];
-        await ctx.answerCbQuery('Processing report...');
-        replyParams = {
-          message_id: ctx.callbackQuery.message.message_id,
-          chat_id: ctx.callbackQuery.message.chat.id,
-        };
-      } else {
-        const msg = (ctx.message as any)?.text || '';
-        mintAddress = msg.replace(/\/report\s*/, '');
-        replyParams = {
-          message_id: ctx.message.message_id,
-          chat_id: ctx.message.chat.id,
-        };
+  private async handleReport(ctx: Context) {
+    const loading = new LoadingMessage(ctx);
+    try {
+      // Handle report button click
+      if (ctx.callbackQuery && 'data' in ctx.callbackQuery) {
+        const mintAddress = ctx.callbackQuery.data.split(':')[1];
+        await ctx.answerCbQuery('Preparing report command...');
+
+        await ctx.reply(
+          'Send your report in one of these formats:\n\n' +
+            '1. Text message:\n/report <token> <message>\n\n' +
+            '2. Photo with caption:\n/report <token> <message>\n\n' +
+            'Token to report: ' +
+            mintAddress,
+        );
+        return;
       }
 
-      if (!mintAddress) {
+      // Handle report command
+      if (!ctx.message) return;
+
+      const msg = ctx.message as Message.PhotoMessage | Message.TextMessage;
+      let mintAddress = '';
+      let reportMessage = '';
+      let evidence: string | undefined;
+
+      await loading.start('Processing your report...');
+
+      // Extract command and content
+      const messageText = 'photo' in msg ? msg.caption || '' : msg.text;
+      if (!messageText.startsWith('/report')) {
+        await loading.stop();
+        return ctx.reply('Report must start with /report command');
+      }
+
+      const parts = messageText.replace(/^\/report\s*/, '').split(' ');
+      mintAddress = parts[0];
+      reportMessage = parts.slice(1).join(' ');
+
+      // Handle photo if present
+      if ('photo' in msg && msg.photo.length > 0) {
+        try {
+          // Get the URL for the highest quality photo
+          evidence = await this.getFileUrl(
+            msg.photo[msg.photo.length - 1].file_id,
+          );
+        } catch (err) {
+          this.logger.error('Error processing photo evidence', err);
+          await loading.stop();
+          return ctx.reply(
+            'Failed to process the attached photo. Please try again.',
+          );
+        }
+      }
+
+      if (!mintAddress || !reportMessage) {
+        await loading.stop();
         return ctx.reply(
-          'Invalid command. Usage: /report <token>\nExample: /report JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
+          'Invalid command. Usage: /report <token> <reason>\nExample: /report JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN Suspicious token movement',
         );
       }
 
-      const result = await this.rugcheckService.reportToken(mintAddress);
+      const replyParams = {
+        message_id: msg.message_id,
+        chat_id: msg.chat.id,
+      };
+
+      // Get token info to get creator
+      const tokenInfo = await this.rugcheckService.getTokenReport(mintAddress);
+
+      const result = await this.rugcheckService.reportToken(mintAddress, {
+        creator: tokenInfo.creator || 'unknown',
+        reportedBy: ctx.from?.id.toString() || 'unknown',
+        platform: 'telegram',
+        message: reportMessage,
+        evidence,
+      });
+
+      await loading.stop();
       return ctx.reply(result.message, { reply_parameters: replyParams });
     } catch (err) {
+      await loading.stop();
       this.logger.error('Error processing report command/callback', err);
       return ctx.reply('An error occurred while reporting the token.');
     }
@@ -165,11 +243,16 @@ export class TelegramService
       'RugChekker helps you analyze and detect potential risks in Solana tokens before investing\\. ' +
       'Get detailed security reports, market metrics, and risk assessments for any token\\.\n\n' +
       '*📊 Available Commands:*\n' +
-      '├ /check \\<token\\> \\- Get a detailed risk report\n' +
-      '├ /report \\<token\\> \\- Report a suspicious token\n' +
+      '├ /analyze \\<token\\> \\- Get a detailed risk report\n' +
+      '├ /report \\<token\\> \\<reason\\> [Attachment \\(optional\\)] \\- Report a suspicious token\n' +
+      '├ /creator \\<address\\> \\- Get creator report\n' +
+      '├ /new\\_tokens \\- View recently created tokens\n' +
+      '├ /recent \\- View most viewed tokens\n' +
+      '├ /trending \\- View trending tokens\n' +
+      '├ /verified \\- View verified tokens\n' +
       '└ /help \\- Display this help message\n\n' +
       '*🔍 Example Usage:*\n' +
-      '/check JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN\n\n' +
+      '/analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN\n\n' +
       '_Stay safe with RugChekker_';
 
     return ctx.reply(helpMessage, { parse_mode: 'MarkdownV2' });
@@ -228,6 +311,64 @@ export class TelegramService
     } catch (err) {
       this.logger.error('Error fetching verified tokens', err);
       return ctx.reply('An error occurred while fetching verified tokens.');
+    }
+  }
+
+  private async handleCreatorCommand(ctx: Context) {
+    try {
+      let address = '';
+      let replyParams;
+
+      // Handle both command and callback contexts
+      if (ctx.callbackQuery && 'data' in ctx.callbackQuery) {
+        address = ctx.callbackQuery.data.split(':')[1];
+        await ctx.answerCbQuery('Analyzing creator...');
+        replyParams = {
+          message_id: ctx.callbackQuery.message.message_id,
+          chat_id: ctx.callbackQuery.message.chat.id,
+        };
+      } else if (ctx.message && 'text' in ctx.message) {
+        const msg = ctx.message.text;
+        address = msg.replace(/\/creator\s*/, '');
+        replyParams = {
+          message_id: ctx.message.message_id,
+          chat_id: ctx.message.chat.id,
+        };
+      }
+
+      if (!address) {
+        return ctx.reply(
+          'Invalid command. Usage: /creator <address>\nExample: /creator 7WNRFqMpvqXGi6ytz36fS9tWzNh4ptpkCzASREDBBYoi',
+        );
+      }
+
+      const report = await this.rugcheckService.getCreatorReport(address);
+      const messageText =
+        `*👤 Creator Report for* \`${address}\`\n\n` +
+        `Total Reports: ${report.totalReports}\n` +
+        `Unique Tokens Reported: ${report.uniqueTokensReported}\n\n` +
+        (report.reports.length > 0
+          ? `*🚨 Recent Reports:*\n${report.reports
+              .slice(0, 5)
+              .map((r) => {
+                const evidenceLink = r.evidence
+                  ? `\n  [View Evidence](${r.evidence.replace(/[[\]()]/g, '\\$&')})`
+                  : '';
+                return `• Token: \`${r.mint}\`\n  ${r.message.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&')}${evidenceLink}`;
+              })
+              .join('\n\n')}`
+          : 'No reports found for this creator');
+
+      return ctx.reply(messageText, {
+        parse_mode: 'MarkdownV2',
+        reply_parameters: replyParams,
+        link_preview_options: {
+          is_disabled: true,
+        },
+      });
+    } catch (err) {
+      this.logger.error('Error processing creator command/callback', err);
+      return ctx.reply('An error occurred while fetching creator report.');
     }
   }
 

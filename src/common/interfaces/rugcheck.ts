@@ -1,3 +1,5 @@
+import { TokenReport } from 'src/schemas/token-report.schema';
+
 export interface RugCheckTokenReport {
   mint: string;
   tokenProgram: string;
@@ -30,6 +32,11 @@ export interface RugCheckTokenReport {
   insiderNetworks: InsiderNetwork[] | null;
   detectedAt: Date;
   creatorTokens: null;
+  communityReports?: {
+    tokenReports: number;
+    creatorReports: number;
+    reports: TokenReport[];
+  };
 }
 
 export interface FileMeta {
@@ -227,4 +234,16 @@ export interface VerifiedToken {
   name: string;
   payer: string;
   symbol: string;
+}
+
+export interface TokenReportStats {
+  tokenReports: number;
+  creatorReports: number;
+  reports: TokenReport[];
+}
+
+export interface CreatorReport {
+  reports: TokenReport[];
+  totalReports: number;
+  uniqueTokensReported: number;
 }

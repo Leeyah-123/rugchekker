@@ -3,23 +3,23 @@ import { Context } from 'telegraf';
 
 export class LoadingMessage {
   private message: any;
-  private dots = 0;
+  private frameIndex = 0;
   private interval: NodeJS.Timeout;
   private baseText: string;
   private readonly logger = new Logger('LoadingMessage');
+  private readonly frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
   constructor(private readonly ctx: Context) {}
 
   async start(text: string): Promise<void> {
     this.baseText = text;
-    this.message = await this.ctx.reply(this.baseText);
+    this.message = await this.ctx.reply(`${this.frames[0]} ${this.baseText}`);
 
     this.interval = setInterval(async () => {
-      this.dots = (this.dots + 1) % 4;
-      const newText = this.baseText + '.'.repeat(this.dots);
+      this.frameIndex = (this.frameIndex + 1) % this.frames.length;
+      const newText = `${this.frames[this.frameIndex]} ${this.baseText}`;
 
       try {
-        // Only update if text has changed
         if (this.message?.text !== newText) {
           await this.ctx.telegram.editMessageText(
             this.message.chat.id,
@@ -29,7 +29,6 @@ export class LoadingMessage {
           );
         }
       } catch (error) {
-        // Ignore edit conflicts
         if (
           !error.message?.includes('message is not modified') &&
           !error.message?.includes('message to edit not found')
@@ -37,7 +36,7 @@ export class LoadingMessage {
           this.logger.error('Error updating loading message:', error);
         }
       }
-    }, 500);
+    }, 100);
   }
 
   async stop(): Promise<void> {

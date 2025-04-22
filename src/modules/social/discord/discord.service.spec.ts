@@ -81,7 +81,7 @@ describe('DiscordService', () => {
 
   describe('command handlers', () => {
     const mockMessage = {
-      content: '!check test-mint',
+      content: '!analyze test-mint',
       author: { bot: false },
       reply: jest.fn().mockReturnThis(),
       edit: jest.fn(),
@@ -91,8 +91,8 @@ describe('DiscordService', () => {
       jest.clearAllMocks();
     });
 
-    it('should handle check command', async () => {
-      await service['handleCheckCommand'](mockMessage as unknown as Message);
+    it('should handle analyze command', async () => {
+      await service['handleAnalyzeCommand'](mockMessage as unknown as Message);
 
       expect(rugcheckService.getTokenReport).toHaveBeenCalledWith('test-mint');
       expect(mockMessage.reply).toHaveBeenCalled();
@@ -132,10 +132,10 @@ describe('DiscordService', () => {
       expect(mockInteraction.editReply).toHaveBeenCalled();
     });
 
-    it('should handle check button', async () => {
-      mockInteraction.customId = 'check_token:test-mint';
+    it('should handle analyze button', async () => {
+      mockInteraction.customId = 'analyze_token:test-mint';
 
-      await service['handleCheckButton'](
+      await service['handleAnalyzeButton'](
         mockInteraction as unknown as ButtonInteraction,
       );
 
@@ -147,7 +147,7 @@ describe('DiscordService', () => {
   describe('error handling', () => {
     it('should handle API errors gracefully', async () => {
       const mockMessage = {
-        content: '!check invalid',
+        content: '!analyze invalid',
         author: { bot: false },
         reply: jest.fn(),
       };
@@ -156,7 +156,7 @@ describe('DiscordService', () => {
         .spyOn(rugcheckService, 'getTokenReport')
         .mockRejectedValue(new Error());
 
-      await service['handleCheckCommand'](mockMessage as unknown as Message);
+      await service['handleAnalyzeCommand'](mockMessage as unknown as Message);
 
       expect(mockMessage.reply).toHaveBeenCalledWith(
         expect.stringContaining('error occurred'),

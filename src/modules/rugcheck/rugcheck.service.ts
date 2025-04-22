@@ -1,16 +1,21 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectModel } from '@nestjs/mongoose';
 import { AxiosError } from 'axios';
+import { Model } from 'mongoose';
 import { lastValueFrom } from 'rxjs';
 import {
+  CreatorReport,
+  RecentToken,
   RugCheckTokenReport,
   TokenReportResponse,
+  TokenReportStats,
   TokenStat,
-  RecentToken,
   TrendingToken,
   VerifiedToken,
 } from 'src/common/interfaces/rugcheck';
+import { TokenReport } from 'src/schemas/token-report.schema';
 
 @Injectable()
 export class RugcheckService {
@@ -21,12 +26,41 @@ export class RugcheckService {
   constructor(
     private readonly httpService: HttpService,
     private readonly config: ConfigService,
+    @InjectModel(TokenReport.name)
+    private tokenReportModel: Model<TokenReport>,
   ) {
     this.baseUrl = this.config.getOrThrow<string>('RUGCHECK_API_URL');
     this.apiKey = this.config.getOrThrow<string>('RUGCHECK_API_KEY');
   }
 
   async getTokenReport(mintAddress: string): Promise<RugCheckTokenReport> {
+    try {
+      const [apiReport, communityReports] = await Promise.all([
+        this.fetchTokenReport(mintAddress),
+        this.getTokenReportStats(mintAddress),
+      ]);
+
+      return {
+        ...apiReport,
+        communityReports,
+      };
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        this.logger.error(
+          `RugCheck API error: ${error.response?.status} - ${error.response?.data}`,
+        );
+      } else if (error instanceof Error) {
+        this.logger.error(`RugCheck API error: ${error.message}`);
+      } else {
+        this.logger.error('Failed to fetch RugCheck report', error);
+      }
+      throw error;
+    }
+  }
+
+  private async fetchTokenReport(
+    mintAddress: string,
+  ): Promise<RugCheckTokenReport> {
     try {
       const url = `${this.baseUrl}/tokens/${mintAddress}/report`;
       const response = await lastValueFrom(
@@ -49,37 +83,81 @@ export class RugcheckService {
     }
   }
 
-  async reportToken(mintAddress: string): Promise<TokenReportResponse> {
+  async reportToken(
+    mint: string,
+    reportData: {
+      creator: string;
+      reportedBy: string;
+      platform: string;
+      message: string;
+      evidence?: string;
+    },
+  ): Promise<TokenReportResponse> {
     try {
-      const url = `${this.baseUrl}/tokens/${mintAddress}/report`;
-      const response = await lastValueFrom(
-        this.httpService.post<TokenReportResponse>(url, null, {
-          headers: { Authorization: this.apiKey },
-        }),
-      );
-      return response.data;
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        this.logger.error(
-          `Failed to report token: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`,
-        );
-
-        if (error.response?.data?.error === 'already reported') {
-          return {
-            success: true,
-            message: 'Token has already been reported',
-          };
-        }
-
+      // Check if user has reported this token before
+      const existingReport = await this.tokenReportModel.findOne({
+        mint,
+        reportedBy: reportData.reportedBy,
+      });
+      if (existingReport) {
         return {
           success: false,
-          message: error.response?.data?.error || 'Failed to report token',
+          message: 'You have already reported this token.',
         };
       }
+
+      const report = new this.tokenReportModel({
+        mint,
+        ...reportData,
+      });
+      await report.save();
+
+      return {
+        success: true,
+        message: 'Token has been reported successfully.',
+      };
+    } catch (error) {
+      this.logger.error('Failed to save token report', error);
       return {
         success: false,
-        message: 'An unexpected error occurred while reporting the token',
+        message: 'Failed to save report.',
       };
+    }
+  }
+
+  async getTokenReportStats(mint: string): Promise<TokenReportStats> {
+    const reports = await this.tokenReportModel
+      .find({ mint })
+      .sort({ createdAt: -1 })
+      .exec();
+    const creator = reports[0]?.creator;
+
+    const creatorReports = creator
+      ? (await this.tokenReportModel.find({ creator }).exec()).length
+      : 0;
+
+    return {
+      tokenReports: reports.length,
+      creatorReports,
+      reports,
+    };
+  }
+
+  async getCreatorReport(creator: string): Promise<CreatorReport> {
+    try {
+      const reports = await this.tokenReportModel
+        .find({ creator })
+        .sort({ createdAt: -1 })
+        .exec();
+
+      return {
+        reports,
+        totalReports: reports.length,
+        uniqueTokensReported: new Set(reports.map((r) => r.mint)).size,
+      };
+    } catch (error) {
+      this.logger.error('Failed to fetch creator reports', error);
+      throw error;
     }
   }
 
@@ -107,6 +185,17 @@ export class RugcheckService {
           headers: { Authorization: this.apiKey },
         }),
       );
+
+      // Sort tokens by createdAt in descending order if array has createAt property
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        if ('createAt' in response.data[0]) {
+          return response.data.sort(
+            (a: any, b: any) =>
+              new Date(b.createAt).getTime() - new Date(a.createAt).getTime(),
+          ) as T;
+        }
+      }
+
       return response.data;
     } catch (error) {
       this.logger.error(`Failed to fetch ${endpoint} tokens`, error);
