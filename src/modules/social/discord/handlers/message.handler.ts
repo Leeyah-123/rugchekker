@@ -31,11 +31,19 @@ export function formatRiskReport(
   };
 
   const embed = new EmbedBuilder()
-    .setTitle(`Risk Report for ${tokenLabel}`)
-    .setDescription(
-      `Token: ${report.tokenMeta.name} (${report.tokenMeta.symbol})`,
+    .setTitle(
+      `Risk Report for ${report.tokenMeta.name} (${report.tokenMeta.symbol})`,
     )
     .addFields(
+      {
+        name: '🪙 Token Info',
+        value: [
+          `Address: [${report.mint}](https://solscan.io/token/${report.mint})`,
+          `Creator: ${report.creator ? `[${report.creator}](https://solscan.io/account/${report.creator})` : 'None'}`,
+          `Program: [${report.tokenProgram}](https://solscan.io/account/${report.tokenProgram})`,
+          `Type: ${report.tokenType}`,
+        ].join('\n'),
+      },
       {
         name: '📊 Risk Score',
         value: `${report.score_normalised.toFixed(2)}/100`,

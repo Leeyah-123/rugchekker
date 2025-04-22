@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Context, Telegraf } from 'telegraf';
-import { Message } from 'telegraf/typings/core/types/typegram';
+import { Message, ReplyParameters } from 'telegraf/typings/core/types/typegram';
 import { AiService } from '../../ai/ai.service';
 import { RugcheckService } from '../../rugcheck/rugcheck.service';
 import { BasePlatformService } from '../base/base.service';
@@ -54,6 +54,14 @@ export class TelegramService
       this.handleCreatorCommand(ctx),
     );
 
+    // Add photo message handler
+    this.bot.on('photo', (ctx) => {
+      const caption = ctx.message?.caption;
+      if (caption?.startsWith('/report')) {
+        return this.handleReport(ctx);
+      }
+    });
+
     this.logger.log('Telegram bot launched (polling mode)');
   }
 
@@ -75,7 +83,7 @@ export class TelegramService
     const loading = new LoadingMessage(ctx);
     try {
       let mintAddress = '';
-      let replyParams;
+      let replyParams: ReplyParameters | undefined;
 
       // Handle both command and callback contexts
       if (
@@ -128,6 +136,20 @@ export class TelegramService
     }
   }
 
+  private async getFileUrl(fileId: string): Promise<string> {
+    try {
+      const file = await this.bot.telegram.getFile(fileId);
+      if (!file.file_path) {
+        throw new Error('No file path returned');
+      }
+      const token = this.config.getOrThrow<string>('TELEGRAM_BOT_TOKEN');
+      return `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+    } catch (err) {
+      this.logger.error('Error getting file URL', err);
+      throw new Error('Failed to get file URL');
+    }
+  }
+
   private async handleReport(ctx: Context) {
     const loading = new LoadingMessage(ctx);
     try {
@@ -169,7 +191,18 @@ export class TelegramService
 
       // Handle photo if present
       if ('photo' in msg && msg.photo.length > 0) {
-        evidence = msg.photo[msg.photo.length - 1].file_id;
+        try {
+          // Get the URL for the highest quality photo
+          evidence = await this.getFileUrl(
+            msg.photo[msg.photo.length - 1].file_id,
+          );
+        } catch (err) {
+          this.logger.error('Error processing photo evidence', err);
+          await loading.stop();
+          return ctx.reply(
+            'Failed to process the attached photo. Please try again.',
+          );
+        }
       }
 
       if (!mintAddress || !reportMessage) {
@@ -211,7 +244,7 @@ export class TelegramService
       'Get detailed security reports, market metrics, and risk assessments for any token\\.\n\n' +
       '*📊 Available Commands:*\n' +
       '├ /analyze \\<token\\> \\- Get a detailed risk report\n' +
-      '├ /report \\<token\\> \\<reason\\> [Attachment (optional)] \\- Report a suspicious token\n' +
+      '├ /report \\<token\\> \\<reason\\> [Attachment \\(optional\\)] \\- Report a suspicious token\n' +
       '├ /creator \\<address\\> \\- Get creator report\n' +
       '├ /new\\_tokens \\- View recently created tokens\n' +
       '├ /recent \\- View most viewed tokens\n' +

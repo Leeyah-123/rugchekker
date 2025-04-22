@@ -34,15 +34,28 @@ export class RugcheckService {
   }
 
   async getTokenReport(mintAddress: string): Promise<RugCheckTokenReport> {
-    const [report, reportStats] = await Promise.all([
-      this.fetchTokenReport(mintAddress),
-      this.getTokenReportStats(mintAddress),
-    ]);
+    try {
+      const [apiReport, communityReports] = await Promise.all([
+        this.fetchTokenReport(mintAddress),
+        this.getTokenReportStats(mintAddress),
+      ]);
 
-    return {
-      ...report,
-      communityReports: reportStats,
-    };
+      return {
+        ...apiReport,
+        communityReports,
+      };
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        this.logger.error(
+          `RugCheck API error: ${error.response?.status} - ${error.response?.data}`,
+        );
+      } else if (error instanceof Error) {
+        this.logger.error(`RugCheck API error: ${error.message}`);
+      } else {
+        this.logger.error('Failed to fetch RugCheck report', error);
+      }
+      throw error;
+    }
   }
 
   private async fetchTokenReport(
@@ -81,6 +94,18 @@ export class RugcheckService {
     },
   ): Promise<TokenReportResponse> {
     try {
+      // Check if user has reported this token before
+      const existingReport = await this.tokenReportModel.findOne({
+        mint,
+        reportedBy: reportData.reportedBy,
+      });
+      if (existingReport) {
+        return {
+          success: false,
+          message: 'You have already reported this token.',
+        };
+      }
+
       const report = new this.tokenReportModel({
         mint,
         ...reportData,
@@ -89,19 +114,22 @@ export class RugcheckService {
 
       return {
         success: true,
-        message: 'Token has been reported successfully',
+        message: 'Token has been reported successfully.',
       };
     } catch (error) {
       this.logger.error('Failed to save token report', error);
       return {
         success: false,
-        message: 'Failed to save report',
+        message: 'Failed to save report.',
       };
     }
   }
 
   async getTokenReportStats(mint: string): Promise<TokenReportStats> {
-    const reports = await this.tokenReportModel.find({ mint }).exec();
+    const reports = await this.tokenReportModel
+      .find({ mint })
+      .sort({ createdAt: -1 })
+      .exec();
     const creator = reports[0]?.creator;
 
     const creatorReports = creator
@@ -116,14 +144,21 @@ export class RugcheckService {
   }
 
   async getCreatorReport(creator: string): Promise<CreatorReport> {
-    const reports = await this.tokenReportModel.find({ creator }).exec();
-    const uniqueTokens = new Set(reports.map((r) => r.mint)).size;
+    try {
+      const reports = await this.tokenReportModel
+        .find({ creator })
+        .sort({ createdAt: -1 })
+        .exec();
 
-    return {
-      reports,
-      totalReports: reports.length,
-      uniqueTokensReported: uniqueTokens,
-    };
+      return {
+        reports,
+        totalReports: reports.length,
+        uniqueTokensReported: new Set(reports.map((r) => r.mint)).size,
+      };
+    } catch (error) {
+      this.logger.error('Failed to fetch creator reports', error);
+      throw error;
+    }
   }
 
   async getNewTokens(): Promise<TokenStat[]> {
@@ -150,6 +185,17 @@ export class RugcheckService {
           headers: { Authorization: this.apiKey },
         }),
       );
+
+      // Sort tokens by createdAt in descending order if array has createAt property
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        if ('createAt' in response.data[0]) {
+          return response.data.sort(
+            (a: any, b: any) =>
+              new Date(b.createAt).getTime() - new Date(a.createAt).getTime(),
+          ) as T;
+        }
+      }
+
       return response.data;
     } catch (error) {
       this.logger.error(`Failed to fetch ${endpoint} tokens`, error);

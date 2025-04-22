@@ -48,6 +48,10 @@ export function formatTelegramReport(
     `├ Name: ${escapeMarkdown(report.tokenMeta.name)}\n` +
     `├ Symbol: ${escapeMarkdown(report.tokenMeta.symbol)}\n` +
     `├ Price: $${escapeMarkdown(report.price.toFixed(4))}\n` +
+    `├ Creator: ${report.creator ? `[${escapeMarkdown(report.creator)}](https://solscan.io/account/${report.creator})` : 'Unknown'}\n` +
+    `├ Program: [${escapeMarkdown(report.tokenProgram)}](https://solscan.io/account/${report.tokenProgram})\n` +
+    `└ Token Address: [${escapeMarkdown(report.mint)}](https://solscan.io/token/${report.mint})\n\n` +
+    `📈 *Market Metrics*\n` +
     `├ Total Holders: ${escapeMarkdown(report.totalHolders.toLocaleString())}\n` +
     `└ Total Liquidity: $${escapeMarkdown(report.totalMarketLiquidity.toLocaleString(undefined, { maximumFractionDigits: 2 }))}\n\n` +
     `⚠️ *Risk Assessment*\n` +
