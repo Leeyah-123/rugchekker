@@ -60,9 +60,9 @@ export function formatTokensList(
   const components = tokens.slice(0, 5).map((token) =>
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
-        .setCustomId(`check_token:${token.mint}`)
+        .setCustomId(`analyze_token:${token.mint}`)
         .setLabel(
-          `Check ${
+          `Analyze ${
             ('symbol' in token && token.symbol) ||
             ('metadata' in token && token.metadata.symbol) ||
             `${token.mint.slice(0, 6)}...`
@@ -86,7 +86,7 @@ export function formatTokensList(
 
   if (tokens.length > 5) {
     embed.setFooter({
-      text: `Showing actions for first 5 tokens out of ${tokens.length}. Use !check <token> or !report <token> to analyze or report other tokens.`,
+      text: `Showing actions for first 5 tokens out of ${tokens.length}. Use !analyze <token> or !report <token> to analyze or report other tokens.`,
     });
   }
 

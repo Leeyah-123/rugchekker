@@ -1,16 +1,21 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectModel } from '@nestjs/mongoose';
 import { AxiosError } from 'axios';
+import { Model } from 'mongoose';
 import { lastValueFrom } from 'rxjs';
 import {
+  CreatorReport,
+  RecentToken,
   RugCheckTokenReport,
   TokenReportResponse,
+  TokenReportStats,
   TokenStat,
-  RecentToken,
   TrendingToken,
   VerifiedToken,
 } from 'src/common/interfaces/rugcheck';
+import { TokenReport } from 'src/schemas/token-report.schema';
 
 @Injectable()
 export class RugcheckService {
@@ -21,12 +26,28 @@ export class RugcheckService {
   constructor(
     private readonly httpService: HttpService,
     private readonly config: ConfigService,
+    @InjectModel(TokenReport.name)
+    private tokenReportModel: Model<TokenReport>,
   ) {
     this.baseUrl = this.config.getOrThrow<string>('RUGCHECK_API_URL');
     this.apiKey = this.config.getOrThrow<string>('RUGCHECK_API_KEY');
   }
 
   async getTokenReport(mintAddress: string): Promise<RugCheckTokenReport> {
+    const [report, reportStats] = await Promise.all([
+      this.fetchTokenReport(mintAddress),
+      this.getTokenReportStats(mintAddress),
+    ]);
+
+    return {
+      ...report,
+      communityReports: reportStats,
+    };
+  }
+
+  private async fetchTokenReport(
+    mintAddress: string,
+  ): Promise<RugCheckTokenReport> {
     try {
       const url = `${this.baseUrl}/tokens/${mintAddress}/report`;
       const response = await lastValueFrom(
@@ -49,38 +70,60 @@ export class RugcheckService {
     }
   }
 
-  async reportToken(mintAddress: string): Promise<TokenReportResponse> {
+  async reportToken(
+    mint: string,
+    reportData: {
+      creator: string;
+      reportedBy: string;
+      platform: string;
+      message: string;
+      evidence?: string;
+    },
+  ): Promise<TokenReportResponse> {
     try {
-      const url = `${this.baseUrl}/tokens/${mintAddress}/report`;
-      const response = await lastValueFrom(
-        this.httpService.post<TokenReportResponse>(url, null, {
-          headers: { Authorization: this.apiKey },
-        }),
-      );
-      return response.data;
+      const report = new this.tokenReportModel({
+        mint,
+        ...reportData,
+      });
+      await report.save();
+
+      return {
+        success: true,
+        message: 'Token has been reported successfully',
+      };
     } catch (error) {
-      if (error instanceof AxiosError) {
-        this.logger.error(
-          `Failed to report token: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`,
-        );
-
-        if (error.response?.data?.error === 'already reported') {
-          return {
-            success: true,
-            message: 'Token has already been reported',
-          };
-        }
-
-        return {
-          success: false,
-          message: error.response?.data?.error || 'Failed to report token',
-        };
-      }
+      this.logger.error('Failed to save token report', error);
       return {
         success: false,
-        message: 'An unexpected error occurred while reporting the token',
+        message: 'Failed to save report',
       };
     }
+  }
+
+  async getTokenReportStats(mint: string): Promise<TokenReportStats> {
+    const reports = await this.tokenReportModel.find({ mint }).exec();
+    const creator = reports[0]?.creator;
+
+    const creatorReports = creator
+      ? (await this.tokenReportModel.find({ creator }).exec()).length
+      : 0;
+
+    return {
+      tokenReports: reports.length,
+      creatorReports,
+      reports,
+    };
+  }
+
+  async getCreatorReport(creator: string): Promise<CreatorReport> {
+    const reports = await this.tokenReportModel.find({ creator }).exec();
+    const uniqueTokens = new Set(reports.map((r) => r.mint)).size;
+
+    return {
+      reports,
+      totalReports: reports.length,
+      uniqueTokensReported: uniqueTokens,
+    };
   }
 
   async getNewTokens(): Promise<TokenStat[]> {

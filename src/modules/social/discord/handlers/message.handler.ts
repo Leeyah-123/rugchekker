@@ -5,6 +5,7 @@ import {
   EmbedBuilder,
 } from 'discord.js';
 import { RugCheckTokenReport } from 'src/common/interfaces/rugcheck';
+import { TokenReport } from 'src/schemas/token-report.schema';
 
 export function formatRiskReport(
   tokenLabel: string,
@@ -78,6 +79,14 @@ export function formatRiskReport(
     embed.setImage(report.fileMeta.image);
   }
 
+  if (report.communityReports) {
+    embed.addFields({
+      name: '🚨 Community Reports',
+      value: `Token Reports: ${report.communityReports.tokenReports}\nCreator Reports: ${report.communityReports.creatorReports}`,
+      inline: true,
+    });
+  }
+
   if (aiInsights) {
     embed.addFields({
       name: '🤖 AI Insights',
@@ -87,6 +96,11 @@ export function formatRiskReport(
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
+      .setCustomId(`check_creator:${report.creator}`)
+      .setLabel('Check Creator')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('👤'),
+    new ButtonBuilder()
       .setCustomId(`report_token:${report.mint}`)
       .setLabel('Report Token')
       .setStyle(ButtonStyle.Danger)
@@ -94,4 +108,39 @@ export function formatRiskReport(
   );
 
   return { embed, components: [row] };
+}
+
+export function formatCreatorReport(
+  address: string,
+  report: {
+    reports: TokenReport[];
+    totalReports: number;
+    uniqueTokensReported: number;
+  },
+): { embed: EmbedBuilder } {
+  const embed = new EmbedBuilder()
+    .setTitle(`Creator Report: ${address}`)
+    .addFields(
+      {
+        name: '📊 Report Stats',
+        value: `Total Reports: ${report.totalReports}\nUnique Tokens Reported: ${report.uniqueTokensReported}`,
+      },
+      {
+        name: '🚨 Recent Reports',
+        value:
+          report.reports
+            .slice(0, 5)
+            .map(
+              (r) =>
+                `**Token: ${r.mint}**\n${r.message}\nReported: ${new Date(
+                  r.createdAt,
+                ).toLocaleDateString()}`,
+            )
+            .join('\n\n') || 'No reports found',
+      },
+    )
+    .setColor(0xff0000)
+    .setTimestamp();
+
+  return { embed };
 }

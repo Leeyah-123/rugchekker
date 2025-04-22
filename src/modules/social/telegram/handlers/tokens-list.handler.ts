@@ -56,7 +56,7 @@ export function formatTokensList(
   const tokenList = tokens.map(formatTokenItem).join('\n\n');
   const footerMessage =
     tokens.length > 5
-      ? `\n\n_Showing actions for first 5 tokens out of ${tokens.length}\\. Use /check \\<token\\> or /report \\<token\\> to analyze or report other tokens\\._`
+      ? `\n\n_Showing actions for first 5 tokens out of ${tokens.length}\\. Use /analyze \\<token\\> or /report \\<token\\> to analyze or report other tokens\\._`
       : '';
 
   const text = `*${escapeMarkdown(title)}*\n\n${tokenList}${footerMessage}`;
@@ -65,12 +65,12 @@ export function formatTokensList(
   const keyboard: InlineKeyboardMarkup = {
     inline_keyboard: tokens.slice(0, 5).map((token) => [
       {
-        text: `📊 Check ${
+        text: `📊 Analyze ${
           ('symbol' in token && token.symbol) ||
           ('metadata' in token && token.metadata.symbol) ||
           `${token.mint.slice(0, 6)}...`
         }`,
-        callback_data: `check_token:${token.mint}`,
+        callback_data: `analyze_token:${token.mint}`,
       },
       {
         text: `🚨 Report ${
