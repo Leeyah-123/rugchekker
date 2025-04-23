@@ -418,7 +418,7 @@ export class DiscordService extends BasePlatformService {
       if (!address || address === 'unknown') {
         return interaction.reply({
           content: 'Token creator is unknown.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 
