@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { truncateAddress, escapeMarkdown } from 'src/shared/utils';
+import { escapeMarkdown, truncateAddress } from 'src/shared/utils';
 import { Context, Telegraf } from 'telegraf';
 import { Message, ReplyParameters } from 'telegraf/typings/core/types/typegram';
 import { AiService } from '../../ai/ai.service';
@@ -41,6 +41,8 @@ export class TelegramService
       }),
     );
 
+    this.bot.command('help', (ctx) => this.handleHelpCommand(ctx));
+
     // Add analyze command and callback handler
     this.bot.command('analyze', (ctx) => this.handleAnalyze(ctx));
     this.bot.action(/^analyze_token:(.+)$/, (ctx) => this.handleAnalyze(ctx));
@@ -48,8 +50,6 @@ export class TelegramService
     // Add report command and callback handler
     this.bot.command('report', (ctx) => this.handleReport(ctx));
     this.bot.action(/^report_token:(.+)$/, (ctx) => this.handleReport(ctx));
-
-    this.bot.command('help', (ctx) => this.handleHelpCommand(ctx));
 
     this.bot.command('new_tokens', (ctx) => this.handleNewTokens(ctx));
     this.bot.command('recent', (ctx) => this.handleRecent(ctx));
@@ -320,12 +320,13 @@ export class TelegramService
   private async handleHelpCommand(ctx: Context) {
     const helpMessage =
       '*🛡️ RugChekker \\- Solana Token Security Bot*\n\n' +
-      'RugChekker helps you analyze and detect potential risks in Solana tokens before investing\\. ' +
+      'Welcome to RugChekker. Analyze and detect potential risks in Solana tokens before investing\\. ' +
       'Get detailed security reports, market metrics, and risk assessments for any token\\.\n\n' +
       '*📊 Available Commands:*\n' +
       '├ /analyze \\<token\\> \\- Get a detailed risk report\n' +
       '├ /report \\<token\\> \\<reason\\> [Attachment \\(optional\\)] \\- Report a suspicious token\n' +
       '├ /creator \\<address\\> \\- Get creator report\n' +
+      '├ /insiders \\<token\\> [participants] \\- View insider trading network\n' +
       '├ /new\\_tokens \\- View recently created tokens\n' +
       '├ /recent \\- View most viewed tokens\n' +
       '├ /trending \\- View trending tokens\n' +
@@ -567,7 +568,7 @@ export class TelegramService
         '*Insider Trade Network Analysis*',
         `Mode: ${participantsOnly ? 'Participants Only' : 'All Accounts'}`,
         '\n',
-        '*🔝 Top Holders:*',
+        '*🔝 Top Insider Holders:*',
         ...graphData
           .flatMap((item) => item.nodes)
           .filter((n) => n.holdings > 0)

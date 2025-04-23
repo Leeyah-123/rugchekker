@@ -192,7 +192,7 @@ export class DiscordService extends BasePlatformService {
     const embed = new EmbedBuilder()
       .setTitle('🛡️ RugChekker - Solana Token Security Bot')
       .setDescription(
-        'RugChekker helps you analyze and detect potential risks in Solana tokens before investing. ' +
+        'Welcome to RugChekker. Analyze and detect potential risks in Solana tokens before investing.' +
           'Get detailed security reports, market metrics, and risk assessments for any token.',
       )
       .addFields({
@@ -201,6 +201,7 @@ export class DiscordService extends BasePlatformService {
           '`!analyze <token>` - Get a detailed risk report\n' +
           '`!report <token> <reason> [Attachment (optional)]` - Report a suspicious token\n' +
           '`!creator <address>` - Get creator report\n' +
+          '`!insiders <token> [participants]` - View insider trading network\n' +
           '`!new_tokens` - View recently created tokens\n' +
           '`!recent` - View most viewed tokens\n' +
           '`!trending` - View trending tokens\n' +
@@ -513,7 +514,7 @@ export class DiscordService extends BasePlatformService {
 
       if (holders.length > 0) {
         embed.addFields({
-          name: '🔝 Top Holders',
+          name: '🔝 Top Insider Holders',
           value: holders
             .map((n) =>
               escapeMarkdown(
