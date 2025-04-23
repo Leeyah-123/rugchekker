@@ -558,7 +558,7 @@ export class TelegramService
       }
 
       const imageBuffer = await this.graphService.generateInsidersGraph(
-        graphData,
+        graphData as any,
         participantsOnly,
       );
 
@@ -574,10 +574,9 @@ export class TelegramService
           .filter((n) => n.holdings > 0)
           .sort((a, b) => b.holdings - a.holdings)
           .slice(0, 10)
-          .map((n) =>
-            escapeMarkdown(
-              `[${truncateAddress(n.id, 4, 4)}](${escapeMarkdown(`https://solscan.io/account/${n.id}`)}): ${n.holdings}`,
-            ),
+          .map(
+            (n) =>
+              `[${escapeMarkdown(truncateAddress(n.id, 4, 4))}](${`https://solscan\\.io/account/${escapeMarkdown(n.id)}`}): ${n.holdings}`,
           ),
       ].join('\n');
 
