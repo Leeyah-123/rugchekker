@@ -5,11 +5,49 @@ function escapeMarkdown(text: string): string {
   return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
 }
 
+const MAX_CAPTION_LENGTH = 1024; // Telegram's limit for photo captions
+
+function splitLongMessage(text: string): string[] {
+  const parts: string[] = [];
+  let currentPart = '';
+
+  text.split('\n').forEach((line) => {
+    if ((currentPart + line + '\n').length > MAX_CAPTION_LENGTH) {
+      if (currentPart) {
+        parts.push(currentPart.trim());
+        currentPart = '';
+      }
+      // If single line is too long, split it
+      if (line.length > MAX_CAPTION_LENGTH) {
+        const chunks =
+          line.match(new RegExp(`.{1,${MAX_CAPTION_LENGTH}}`, 'g')) || [];
+        parts.push(...chunks.slice(0, -1));
+        currentPart = chunks[chunks.length - 1] + '\n';
+      } else {
+        currentPart = line + '\n';
+      }
+    } else {
+      currentPart += line + '\n';
+    }
+  });
+
+  if (currentPart) {
+    parts.push(currentPart.trim());
+  }
+
+  return parts;
+}
+
 export function formatTelegramReport(
   tokenLabel: string,
   report: RugCheckTokenReport,
   aiInsights?: string,
-): { text: string; reply_markup: InlineKeyboardMarkup } {
+): {
+  text: string;
+  caption: string;
+  continuation?: string[];
+  reply_markup: InlineKeyboardMarkup;
+} {
   const riskList =
     report.risks
       .map(
@@ -104,5 +142,12 @@ export function formatTelegramReport(
     ],
   };
 
-  return { text, reply_markup: keyboard };
+  const allParts = splitLongMessage(text);
+
+  return {
+    text: allParts[0], // Full text for non-photo messages
+    caption: allParts[0], // First part for photo caption
+    continuation: allParts.slice(1), // Additional parts to send as separate messages
+    reply_markup: keyboard,
+  };
 }
