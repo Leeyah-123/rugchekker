@@ -49,9 +49,9 @@ export class TelegramService
     this.bot.command('verified', (ctx) => this.handleVerified(ctx));
 
     // Add creator command and callback handler
-    this.bot.command('creator', (ctx) => this.handleCreatorCommand(ctx));
+    this.bot.command('creator', (ctx) => this.handleCheckCreatorCommand(ctx));
     this.bot.action(/^check_creator:(.+)$/, (ctx) =>
-      this.handleCreatorCommand(ctx),
+      this.handleCheckCreatorCommand(ctx),
     );
 
     // Add photo message handler
@@ -238,8 +238,8 @@ export class TelegramService
       const tokenInfo = await this.rugcheckService.getTokenReport(mintAddress);
 
       const result = await this.rugcheckService.reportToken(mintAddress, {
-        creator: tokenInfo.creator || 'unknown',
-        reportedBy: ctx.from?.id.toString() || 'unknown',
+        creator: tokenInfo.creator,
+        reportedBy: ctx.from?.id.toString(),
         platform: 'telegram',
         message: reportMessage,
         evidence,
@@ -331,14 +331,19 @@ export class TelegramService
     }
   }
 
-  private async handleCreatorCommand(ctx: Context) {
+  private async handleCheckCreatorCommand(ctx: Context) {
     try {
       let address = '';
-      let replyParams;
+      let replyParams: ReplyParameters | undefined;
 
       // Handle both command and callback contexts
       if (ctx.callbackQuery && 'data' in ctx.callbackQuery) {
         address = ctx.callbackQuery.data.split(':')[1];
+
+        if (!address) {
+          return ctx.reply('Token creator is unknown.');
+        }
+
         await ctx.answerCbQuery('Analyzing creator...');
         replyParams = {
           message_id: ctx.callbackQuery.message.message_id,

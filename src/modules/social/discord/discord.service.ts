@@ -168,7 +168,7 @@ export class DiscordService extends BasePlatformService {
 
       const tokenInfo = await this.rugcheckService.getTokenReport(mintAddress);
       const result = await this.rugcheckService.reportToken(mintAddress, {
-        creator: tokenInfo.creator || 'unknown',
+        creator: tokenInfo.creator,
         reportedBy: msg.author.id,
         platform: 'discord',
         message: reason,
@@ -364,7 +364,7 @@ export class DiscordService extends BasePlatformService {
       const tokenInfo = await this.rugcheckService.getTokenReport(mintAddress);
 
       const result = await this.rugcheckService.reportToken(mintAddress, {
-        creator: tokenInfo.creator || 'unknown',
+        creator: tokenInfo.creator,
         reportedBy: interaction.user.id,
         platform: 'discord',
         message: reason,
