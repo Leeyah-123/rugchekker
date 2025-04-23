@@ -1,4 +1,4 @@
-# 🛡️ RugChekker Bot
+# 🛡️ RugChekker
 
 A social media bot for analyzing Solana tokens and detecting potential risks before investing.
 
@@ -33,6 +33,10 @@ A social media bot for analyzing Solana tokens and detecting potential risks bef
 - `/trending` - View trending tokens
 - `/verified` - View verified tokens
 - `/help` - Display help message
+
+### Twitter
+
+`Coming Soon`
 
 ## Setup
 

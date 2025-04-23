@@ -53,6 +53,9 @@ importers:
       telegraf:
         specifier: ^4.16.3
         version: 4.16.3
+      twitter-api-v2:
+        specifier: ^1.22.0
+        version: 1.22.0
     devDependencies:
       '@nestjs/cli':
         specifier: ^10.0.0
@@ -3001,6 +3004,9 @@ packages:
 
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
+
+  twitter-api-v2@1.22.0:
+    resolution: {integrity: sha512-KlcRL9vcBzjeS/PwxX33NziP+SHp9n35DOclKtpOmnNes7nNVnK7WG4pKlHfBqGrY5kAz/8J5ERS8DWkYOaiWw==}
 
   type-check@0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
@@ -6651,6 +6657,8 @@ snapshots:
       strip-bom: 3.0.0
 
   tslib@2.8.1: {}
+
+  twitter-api-v2@1.22.0: {}
 
   type-check@0.4.0:
     dependencies:
