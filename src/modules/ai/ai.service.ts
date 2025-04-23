@@ -21,7 +21,7 @@ export class AiService {
     try {
       const prompt = `As a crypto security expert, analyze this Solana token's risk report and provide a brief recommendation (2-3 sentences max):
       - Token: ${report.tokenMeta.name} (${report.tokenMeta.symbol})
-      - Risk Score: ${report.score_normalised}/100
+      - Risk Score: ${report.score_normalised}/10 (1: Very High, 10: Very Low)
       - Verification: ${report.verification?.jup_verified ? 'Verified' : 'Unverified'}
       - Price: $${report.price}
       - Total Holders: ${report.totalHolders}

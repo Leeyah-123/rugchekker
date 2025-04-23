@@ -5,6 +5,7 @@ import {
   ButtonInteraction,
   Client,
   EmbedBuilder,
+  escapeMarkdown,
   IntentsBitField,
   Message,
   MessageFlags,
@@ -14,6 +15,9 @@ import {
   TextInputStyle,
 } from 'discord.js';
 import { CreatorReport } from 'src/common/interfaces/rugcheck';
+import { GraphService } from 'src/modules/graph/graph.service';
+import { truncateAddress } from 'src/shared/utils';
+import mockData from '../../../mockData';
 import { AiService } from '../../ai/ai.service';
 import { RugcheckService } from '../../rugcheck/rugcheck.service';
 import { BasePlatformService } from '../base/base.service';
@@ -31,6 +35,7 @@ export class DiscordService extends BasePlatformService {
     private readonly config: ConfigService,
     private readonly aiService: AiService,
     private readonly rugcheckService: RugcheckService,
+    private readonly graphService: GraphService,
   ) {
     super();
     this.client = new Client({
@@ -53,6 +58,7 @@ export class DiscordService extends BasePlatformService {
         '!recent': this.handleRecent.bind(this),
         '!trending': this.handleTrending.bind(this),
         '!verified': this.handleVerified.bind(this),
+        '!insiders': this.handleInsidersCommand.bind(this),
       };
 
       const command = message.content.split(' ')[0].toLowerCase();
@@ -186,7 +192,7 @@ export class DiscordService extends BasePlatformService {
     const embed = new EmbedBuilder()
       .setTitle('🛡️ RugChekker - Solana Token Security Bot')
       .setDescription(
-        'RugChekker helps you analyze and detect potential risks in Solana tokens before investing. ' +
+        'Welcome to RugChekker. Analyze and detect potential risks in Solana tokens before investing.' +
           'Get detailed security reports, market metrics, and risk assessments for any token.',
       )
       .addFields({
@@ -195,6 +201,7 @@ export class DiscordService extends BasePlatformService {
           '`!analyze <token>` - Get a detailed risk report\n' +
           '`!report <token> <reason> [Attachment (optional)]` - Report a suspicious token\n' +
           '`!creator <address>` - Get creator report\n' +
+          '`!insiders <token> [participants]` - View insider trading network\n' +
           '`!new_tokens` - View recently created tokens\n' +
           '`!recent` - View most viewed tokens\n' +
           '`!trending` - View trending tokens\n' +
@@ -453,6 +460,82 @@ export class DiscordService extends BasePlatformService {
       this.logger.error('Error processing analyze button', err);
       await interaction.editReply(
         'An error occurred while analyzing the token.',
+      );
+    }
+  }
+
+  private async handleInsidersCommand(msg: Message) {
+    try {
+      const parts = msg.content.replace(/^!insiders\s*/, '').split(' ');
+      const mintAddress = parts[0];
+      const participantsOnly = parts[1]?.toLowerCase() === 'participants';
+
+      if (!mintAddress) {
+        return this.reply(
+          msg.reply.bind(msg),
+          'Invalid command. Usage:\n' +
+            '!insiders <token> [participants]\n\n' +
+            'Examples:\n' +
+            '!insiders JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN\n' +
+            '!insiders JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN participants',
+        );
+      }
+
+      const loadingMsg = await msg.reply('Generating insiders graph...');
+
+      // const graphData =
+      //   await this.rugcheckService.getInsidersGraph(mintAddress);
+      const graphData = mockData;
+      if (!graphData || graphData.length === 0) {
+        return this.reply(
+          msg.reply.bind(msg),
+          'No insider data found for this token.',
+        );
+      }
+      const imageBuffer = await this.graphService.generateInsidersGraph(
+        graphData as any,
+        participantsOnly,
+      );
+
+      const embed = new EmbedBuilder()
+        .setTitle('Insider Trade Network Analysis')
+        .setDescription(
+          `Mode: ${participantsOnly ? 'Participants Only' : 'All Accounts'}`,
+        )
+        .setColor(0x4a90e2)
+        .setImage('attachment://insiders.png');
+
+      // Include holders information
+      const nodes = graphData.flatMap((item) => item.nodes);
+      const holders = nodes
+        .filter((n) => n.holdings > 0)
+        .sort((a, b) => b.holdings - a.holdings)
+        .slice(0, 10);
+
+      if (holders.length > 0) {
+        embed.addFields({
+          name: '🔝 Top Insider Holders',
+          value: holders
+            .map((n) =>
+              escapeMarkdown(
+                `[${truncateAddress(n.id, 4, 4)}](https://solscan.io/account/${n.id}): ${n.holdings}`,
+              ),
+            )
+            .join('\n'),
+        });
+      }
+
+      await loadingMsg.delete();
+
+      return msg.reply({
+        embeds: [embed],
+        files: [{ attachment: imageBuffer, name: 'insiders.png' }],
+      });
+    } catch (err) {
+      this.logger.error('Error generating insiders graph', err);
+      return this.reply(
+        msg.reply.bind(msg),
+        'An error occurred while generating the insiders graph.',
       );
     }
   }

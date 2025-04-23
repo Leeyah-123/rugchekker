@@ -12,7 +12,12 @@ export class LoadingMessage {
 
   async start(text: string): Promise<void> {
     this.baseText = text;
-    this.message = await this.ctx.reply(this.baseText);
+    this.message = await this.ctx.reply(this.baseText, {
+      reply_parameters: {
+        message_id: this.ctx.message.message_id,
+        chat_id: this.ctx.message.chat.id,
+      },
+    });
 
     this.interval = setInterval(async () => {
       this.dots = (this.dots + 1) % 4;
