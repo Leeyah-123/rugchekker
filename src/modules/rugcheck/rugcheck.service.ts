@@ -7,6 +7,7 @@ import { Model } from 'mongoose';
 import { lastValueFrom } from 'rxjs';
 import {
   CreatorReport,
+  InsidersGraphData,
   RecentToken,
   RugCheckTokenReport,
   TokenReportResponse,
@@ -199,6 +200,21 @@ export class RugcheckService {
       return response.data;
     } catch (error) {
       this.logger.error(`Failed to fetch ${endpoint} tokens`, error);
+      throw error;
+    }
+  }
+
+  async getInsidersGraph(mintAddress: string): Promise<InsidersGraphData[]> {
+    try {
+      const url = `${this.baseUrl}/tokens/${mintAddress}/insiders/graph`;
+      const response = await lastValueFrom(
+        this.httpService.get<InsidersGraphData[]>(url, {
+          headers: { Authorization: this.apiKey },
+        }),
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.error('Failed to fetch insiders graph', error);
       throw error;
     }
   }

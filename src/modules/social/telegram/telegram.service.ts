@@ -1,8 +1,10 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { truncateAddress, escapeMarkdown } from 'src/shared/utils';
 import { Context, Telegraf } from 'telegraf';
 import { Message, ReplyParameters } from 'telegraf/typings/core/types/typegram';
 import { AiService } from '../../ai/ai.service';
+import { GraphService } from '../../graph/graph.service';
 import { RugcheckService } from '../../rugcheck/rugcheck.service';
 import { BasePlatformService } from '../base/base.service';
 import { formatTelegramReport } from './handlers/message.handler';
@@ -20,6 +22,7 @@ export class TelegramService
     private readonly config: ConfigService,
     private readonly aiService: AiService,
     private readonly rugcheckService: RugcheckService,
+    private readonly graphService: GraphService,
   ) {
     super();
 
@@ -30,7 +33,12 @@ export class TelegramService
 
     // Register command handlers
     this.bot.start((ctx) =>
-      ctx.reply('Welcome! Use /analyze <token> to get a risk report.'),
+      ctx.reply('Welcome! Use /analyze <token> to get a risk report.', {
+        reply_parameters: {
+          message_id: ctx.message.message_id,
+          chat_id: ctx.message.chat.id,
+        },
+      }),
     );
 
     // Add analyze command and callback handler
@@ -54,11 +62,30 @@ export class TelegramService
       this.handleCheckCreatorCommand(ctx),
     );
 
+    // Add insiders command
+    this.bot.command('insiders', (ctx) => this.handleInsidersCommand(ctx));
+
     // Add photo message handler
     this.bot.on('photo', (ctx) => {
       const caption = ctx.message?.caption;
       if (caption?.startsWith('/report')) {
         return this.handleReport(ctx);
+      }
+    });
+
+    // Catch-all handler for unrecognized commands
+    this.bot.on('text', (ctx) => {
+      const messageText = ctx.message.text;
+      if (messageText.startsWith('/')) {
+        return ctx.reply(
+          'Unrecognized command. Use /help to see available commands.',
+          {
+            reply_parameters: {
+              message_id: ctx.message.message_id,
+              chat_id: ctx.message.chat.id,
+            },
+          },
+        );
       }
     });
 
@@ -149,7 +176,14 @@ export class TelegramService
     } catch (err) {
       await loading.stop();
       this.logger.error('Error processing analyze command/callback', err);
-      return ctx.reply('An error occurred while processing your request.');
+      return ctx.reply('An error occurred while processing your request.', {
+        reply_parameters: ctx.message
+          ? {
+              message_id: ctx.message.message_id,
+              chat_id: ctx.message.chat.id,
+            }
+          : undefined,
+      });
     }
   }
 
@@ -181,6 +215,13 @@ export class TelegramService
             '2. Photo with caption:\n/report <token> <message>\n\n' +
             'Token to report: ' +
             mintAddress,
+          {
+            parse_mode: 'MarkdownV2',
+            reply_parameters: {
+              message_id: ctx.callbackQuery.message.message_id,
+              chat_id: ctx.callbackQuery.message.chat.id,
+            },
+          },
         );
         return;
       }
@@ -199,7 +240,12 @@ export class TelegramService
       const messageText = 'photo' in msg ? msg.caption || '' : msg.text;
       if (!messageText.startsWith('/report')) {
         await loading.stop();
-        return ctx.reply('Report must start with /report command');
+        return ctx.reply('Report must start with /report command', {
+          reply_parameters: {
+            message_id: msg.message_id,
+            chat_id: msg.chat.id,
+          },
+        });
       }
 
       const parts = messageText.replace(/^\/report\s*/, '').split(' ');
@@ -218,6 +264,12 @@ export class TelegramService
           await loading.stop();
           return ctx.reply(
             'Failed to process the attached photo. Please try again.',
+            {
+              reply_parameters: {
+                message_id: msg.message_id,
+                chat_id: msg.chat.id,
+              },
+            },
           );
         }
       }
@@ -226,6 +278,12 @@ export class TelegramService
         await loading.stop();
         return ctx.reply(
           'Invalid command. Usage: /report <token> <reason>\nExample: /report JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN Suspicious token movement',
+          {
+            reply_parameters: {
+              message_id: msg.message_id,
+              chat_id: msg.chat.id,
+            },
+          },
         );
       }
 
@@ -250,7 +308,12 @@ export class TelegramService
     } catch (err) {
       await loading.stop();
       this.logger.error('Error processing report command/callback', err);
-      return ctx.reply('An error occurred while reporting the token.');
+      return ctx.reply('An error occurred while reporting the token.', {
+        reply_parameters: {
+          message_id: ctx.message.message_id,
+          chat_id: ctx.message.chat.id,
+        },
+      });
     }
   }
 
@@ -272,62 +335,112 @@ export class TelegramService
       '/analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN\n\n' +
       '_Stay safe with RugChekker_';
 
-    return ctx.reply(helpMessage, { parse_mode: 'MarkdownV2' });
+    return ctx.reply(helpMessage, {
+      parse_mode: 'MarkdownV2',
+      reply_parameters: {
+        message_id: ctx.message.message_id,
+        chat_id: ctx.message.chat.id,
+      },
+    });
   }
 
   private async handleNewTokens(ctx: Context) {
+    const replyParams = {
+      message_id: ctx.message.message_id,
+      chat_id: ctx.message.chat.id,
+    };
+
     try {
       const tokens = await this.rugcheckService.getNewTokens();
       const { text, reply_markup } = formatTokensList(
         '🆕 Recently Created Tokens',
         tokens,
       );
-      return ctx.reply(text, { parse_mode: 'MarkdownV2', reply_markup });
+      return ctx.reply(text, {
+        parse_mode: 'MarkdownV2',
+        reply_markup,
+        reply_parameters: replyParams,
+      });
     } catch (err) {
       this.logger.error('Error fetching new tokens', err);
-      return ctx.reply('An error occurred while fetching new tokens.');
+      return ctx.reply('An error occurred while fetching new tokens.', {
+        reply_parameters: replyParams,
+      });
     }
   }
 
   private async handleRecent(ctx: Context) {
+    const replyParams = {
+      message_id: ctx.message.message_id,
+      chat_id: ctx.message.chat.id,
+    };
+
     try {
       const tokens = await this.rugcheckService.getRecentTokens();
       const { text, reply_markup } = formatTokensList(
         '👀 Most Viewed Tokens',
         tokens,
       );
-      return ctx.reply(text, { parse_mode: 'MarkdownV2', reply_markup });
+      return ctx.reply(text, {
+        parse_mode: 'MarkdownV2',
+        reply_markup,
+        reply_parameters: replyParams,
+      });
     } catch (err) {
       this.logger.error('Error fetching recent tokens', err);
-      return ctx.reply('An error occurred while fetching recent tokens.');
+      return ctx.reply('An error occurred while fetching recent tokens.', {
+        reply_parameters: replyParams,
+      });
     }
   }
 
   private async handleTrending(ctx: Context) {
+    const replyParams = {
+      message_id: ctx.message.message_id,
+      chat_id: ctx.message.chat.id,
+    };
+
     try {
       const tokens = await this.rugcheckService.getTrendingTokens();
       const { text, reply_markup } = formatTokensList(
         '🔥 Trending Tokens',
         tokens,
       );
-      return ctx.reply(text, { parse_mode: 'MarkdownV2', reply_markup });
+      return ctx.reply(text, {
+        parse_mode: 'MarkdownV2',
+        reply_markup,
+        reply_parameters: replyParams,
+      });
     } catch (err) {
       this.logger.error('Error fetching trending tokens', err);
-      return ctx.reply('An error occurred while fetching trending tokens.');
+      return ctx.reply('An error occurred while fetching trending tokens.', {
+        reply_parameters: replyParams,
+      });
     }
   }
 
   private async handleVerified(ctx: Context) {
+    const replyParams = {
+      message_id: ctx.message.message_id,
+      chat_id: ctx.message.chat.id,
+    };
+
     try {
       const tokens = await this.rugcheckService.getVerifiedTokens();
       const { text, reply_markup } = formatTokensList(
         '✅ Recently Verified Tokens',
         tokens,
       );
-      return ctx.reply(text, { parse_mode: 'MarkdownV2', reply_markup });
+      return ctx.reply(text, {
+        parse_mode: 'MarkdownV2',
+        reply_markup,
+        reply_parameters: replyParams,
+      });
     } catch (err) {
       this.logger.error('Error fetching verified tokens', err);
-      return ctx.reply('An error occurred while fetching verified tokens.');
+      return ctx.reply('An error occurred while fetching verified tokens.', {
+        reply_parameters: replyParams,
+      });
     }
   }
 
@@ -363,6 +476,9 @@ export class TelegramService
       if (!address) {
         return ctx.reply(
           'Invalid command. Usage: /creator <address>\nExample: /creator 7WNRFqMpvqXGi6ytz36fS9tWzNh4ptpkCzASREDBBYoi',
+          {
+            reply_parameters: replyParams,
+          },
         );
       }
 
@@ -376,9 +492,9 @@ export class TelegramService
               .slice(0, 5)
               .map((r) => {
                 const evidenceLink = r.evidence
-                  ? `\n  [View Evidence](${r.evidence.replace(/[[\]()]/g, '\\$&')})`
+                  ? `\n  [View Evidence](${escapeMarkdown(r.evidence)})`
                   : '';
-                return `• Token: \`${r.mint}\`\n  ${r.message.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&')}${evidenceLink}`;
+                return `• Token: \`${r.mint}\`\n  ${escapeMarkdown(r.message)}${evidenceLink}`;
               })
               .join('\n\n')}`
           : 'No reports found for this creator');
@@ -392,7 +508,94 @@ export class TelegramService
       });
     } catch (err) {
       this.logger.error('Error processing creator command/callback', err);
-      return ctx.reply('An error occurred while fetching creator report.');
+      return ctx.reply('An error occurred while fetching creator report.', {
+        reply_parameters: {
+          message_id: ctx.message.message_id,
+          chat_id: ctx.message.chat.id,
+        },
+      });
+    }
+  }
+
+  private async handleInsidersCommand(ctx: Context) {
+    const loading = new LoadingMessage(ctx);
+    const replyParams = {
+      message_id: ctx.message.message_id,
+      chat_id: ctx.message.chat.id,
+    };
+
+    try {
+      const parts = ('text' in ctx.message ? ctx.message.text : '')
+        .replace(/^\/insiders\s*/, '')
+        .split(' ');
+
+      const mintAddress = parts[0];
+      const participantsOnly = parts[1]?.toLowerCase() === 'participants';
+
+      if (!mintAddress) {
+        return ctx.reply(
+          'Invalid command. Usage:\n' +
+            '/insiders <token> [participants]\n\n' +
+            'Examples:\n' +
+            '/insiders JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN\n' +
+            '/insiders JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN participants',
+          {
+            reply_parameters: replyParams,
+          },
+        );
+      }
+
+      await loading.start('Generating insiders graph');
+
+      const graphData =
+        await this.rugcheckService.getInsidersGraph(mintAddress);
+      if (!graphData || graphData.length === 0) {
+        await loading.stop();
+        return ctx.reply('No insider trading data found for this token\\.', {
+          reply_parameters: replyParams,
+        });
+      }
+
+      const imageBuffer = await this.graphService.generateInsidersGraph(
+        graphData,
+        participantsOnly,
+      );
+
+      await loading.stop();
+
+      const caption = [
+        '*Insider Trade Network Analysis*',
+        `Mode: ${participantsOnly ? 'Participants Only' : 'All Accounts'}`,
+        '\n',
+        '*🔝 Top Holders:*',
+        ...graphData
+          .flatMap((item) => item.nodes)
+          .filter((n) => n.holdings > 0)
+          .sort((a, b) => b.holdings - a.holdings)
+          .slice(0, 10)
+          .map(
+            (n) =>
+              `[${escapeMarkdown(truncateAddress(n.id))}](${escapeMarkdown(`https://solscan\\.io/account/${n.id}`)}): ${n.holdings} tokens`,
+          ),
+      ].join('\n');
+
+      return ctx.replyWithPhoto(
+        { source: imageBuffer },
+        {
+          caption,
+          parse_mode: 'MarkdownV2',
+          reply_parameters: replyParams,
+        },
+      );
+    } catch (err) {
+      await loading.stop();
+      this.logger.error('Error generating insiders graph', err);
+      return ctx.reply(
+        'An error occurred while generating the insiders graph.',
+        {
+          reply_parameters: replyParams,
+        },
+      );
     }
   }
 

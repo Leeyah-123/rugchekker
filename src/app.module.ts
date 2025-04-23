@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 import { AiModule } from './modules/ai/ai.module';
 import { RugcheckModule } from './modules/rugcheck/rugcheck.module';
 import { SocialModule } from './modules/social/social.module';
+import { GraphService } from './modules/graph/graph.service';
+import { GraphModule } from './modules/graph/graph.module';
 
 @Module({
   imports: [
@@ -26,8 +28,9 @@ import { SocialModule } from './modules/social/social.module';
     AiModule,
     RugcheckModule,
     SocialModule,
+    GraphModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, GraphService],
 })
 export class AppModule {}

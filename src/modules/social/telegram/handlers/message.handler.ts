@@ -1,9 +1,6 @@
 import { RugCheckTokenReport } from 'src/common/interfaces/rugcheck';
+import { escapeMarkdown } from 'src/shared/utils';
 import { InlineKeyboardMarkup } from 'telegraf/typings/core/types/typegram';
-
-function escapeMarkdown(text: string): string {
-  return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
-}
 
 const MAX_CAPTION_LENGTH = 1024; // Telegram's limit for photo captions
 
@@ -57,9 +54,9 @@ export function formatTelegramReport(
       .join('\n') || 'None';
 
   const riskEmoji =
-    report.score_normalised > 70
+    report.score_normalised > 7
       ? '🟢'
-      : report.score_normalised > 40
+      : report.score_normalised > 4
         ? '🟡'
         : '🔴';
 
@@ -93,7 +90,7 @@ export function formatTelegramReport(
     `├ Total Holders: ${escapeMarkdown(report.totalHolders.toLocaleString())}\n` +
     `└ Total Liquidity: $${escapeMarkdown(report.totalMarketLiquidity.toLocaleString(undefined, { maximumFractionDigits: 2 }))}\n\n` +
     `⚠️ *Risk Assessment*\n` +
-    `├ Risk Score: ${riskEmoji} ${escapeMarkdown(report.score_normalised.toFixed(2))}/100\n` +
+    `├ Risk Score: ${riskEmoji} ${escapeMarkdown(report.score_normalised.toFixed(2))}/10\n` +
     `└ Verification: ${verificationInfo}\n\n` +
     `🚨 *Risk Factors*\n${riskList}\n\n` +
     `📊 *Market Info*\n` +
