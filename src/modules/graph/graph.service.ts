@@ -226,7 +226,7 @@ export class GraphService {
           Math.min(maxFontSize, minFontSize + holdingsPercentage * 0.8),
         );
 
-        ctx.font = `bold ${fontSize}px Open Sans`;
+        ctx.font = `bold ${fontSize}px OpenSans`;
 
         // Add background with opacity based on holdings
         const metrics = ctx.measureText(label);
@@ -249,14 +249,14 @@ export class GraphService {
 
         // Add holdings indicator
         const holdingsText = `${holdingsPercentage.toFixed(1)}%`;
-        ctx.font = `${minFontSize}px Open Sans`;
+        ctx.font = `${minFontSize}px OpenSans`;
         ctx.fillStyle = node.participant ? '#ff0000' : '#666666';
         ctx.fillText(holdingsText, pos.x, pos.y + fontSize * 0.8);
       });
 
       // Add title with background
       const titleText = 'Insider Trade Network';
-      ctx.font = 'bold 32px Open Sans';
+      ctx.font = 'bold 32px OpenSans';
       const titleMetrics = ctx.measureText(titleText);
 
       ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
@@ -273,14 +273,14 @@ export class GraphService {
 
       // Add legend
       const legendY = 80;
-      ctx.font = 'bold 16px Open Sans';
+      ctx.font = 'bold 16px OpenSans';
       ctx.fillStyle = '#ff0000';
       ctx.textAlign = 'left';
       ctx.fillText('● Participants', 50, legendY);
       ctx.fillStyle = '#444444';
       ctx.fillText('● Non-participants', 50, legendY + 25);
       ctx.fillStyle = '#666666';
-      ctx.font = '14px Open Sans';
+      ctx.font = '14px OpenSans';
       ctx.fillText('(Size indicates holdings %)', 50, legendY + 50);
 
       return canvas.toBuffer('image/png');
