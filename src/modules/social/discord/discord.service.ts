@@ -142,6 +142,10 @@ export class DiscordService extends BasePlatformService {
       const name = '';
 
       const report = await this.rugcheckService.getTokenReport(mintAddress);
+      if (typeof report === 'string') {
+        return this.reply(msg.reply.bind(msg), report);
+      }
+
       const aiInsights = await this.aiService.analyzeTokenRisks(report);
       const { embed, components } = formatRiskReport(
         name || mintAddress,
@@ -172,6 +176,10 @@ export class DiscordService extends BasePlatformService {
       }
 
       const tokenInfo = await this.rugcheckService.getTokenReport(mintAddress);
+      if (typeof tokenInfo === 'string') {
+        return loading.edit(tokenInfo);
+      }
+
       const result = await this.rugcheckService.reportToken(mintAddress, {
         creator: tokenInfo.creator,
         reportedBy: msg.author.id,
@@ -368,6 +376,9 @@ export class DiscordService extends BasePlatformService {
 
       // Get token info to get creator
       const tokenInfo = await this.rugcheckService.getTokenReport(mintAddress);
+      if (typeof tokenInfo === 'string') {
+        return interaction.editReply(tokenInfo);
+      }
 
       const result = await this.rugcheckService.reportToken(mintAddress, {
         creator: tokenInfo.creator,
@@ -447,6 +458,10 @@ export class DiscordService extends BasePlatformService {
 
       await interaction.deferReply();
       const report = await this.rugcheckService.getTokenReport(mintAddress);
+      if (typeof report === 'string') {
+        return interaction.editReply(report);
+      }
+
       const aiInsights = await this.aiService.analyzeTokenRisks(report);
       const { embed, components } = formatRiskReport(
         mintAddress,
@@ -484,6 +499,10 @@ export class DiscordService extends BasePlatformService {
 
       const graphData =
         await this.rugcheckService.getInsidersGraph(mintAddress);
+      if (typeof graphData === 'string') {
+        return this.reply(msg.reply.bind(msg), graphData);
+      }
+
       if (!graphData || graphData.length === 0) {
         return this.reply(
           msg.reply.bind(msg),

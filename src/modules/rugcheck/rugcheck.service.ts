@@ -34,17 +34,21 @@ export class RugcheckService {
     this.apiKey = this.config.getOrThrow<string>('RUGCHECK_API_KEY');
   }
 
-  async getTokenReport(mintAddress: string): Promise<RugCheckTokenReport> {
+  async getTokenReport(
+    mintAddress: string,
+  ): Promise<RugCheckTokenReport | string> {
     try {
       const [apiReport, communityReports] = await Promise.all([
         this.fetchTokenReport(mintAddress),
         this.getTokenReportStats(mintAddress),
       ]);
 
-      return {
-        ...apiReport,
-        communityReports,
-      };
+      return typeof apiReport === 'string'
+        ? apiReport
+        : {
+            ...apiReport,
+            communityReports,
+          };
     } catch (error) {
       if (error instanceof AxiosError) {
         this.logger.error(
@@ -61,7 +65,7 @@ export class RugcheckService {
 
   private async fetchTokenReport(
     mintAddress: string,
-  ): Promise<RugCheckTokenReport> {
+  ): Promise<RugCheckTokenReport | string> {
     try {
       const url = `${this.baseUrl}/tokens/${mintAddress}/report`;
       const response = await lastValueFrom(
@@ -72,6 +76,10 @@ export class RugcheckService {
       return response.data;
     } catch (error) {
       if (error instanceof AxiosError) {
+        if (error.response.data.error === 'not found') {
+          return 'Token not found or not supported';
+        }
+
         this.logger.error(
           `RugCheck API error: ${error.response?.status} - ${error.response?.data}`,
         );
@@ -204,7 +212,9 @@ export class RugcheckService {
     }
   }
 
-  async getInsidersGraph(mintAddress: string): Promise<InsidersGraphData[]> {
+  async getInsidersGraph(
+    mintAddress: string,
+  ): Promise<InsidersGraphData[] | string> {
     try {
       const url = `${this.baseUrl}/tokens/${mintAddress}/insiders/graph`;
       const response = await lastValueFrom(
@@ -214,6 +224,10 @@ export class RugcheckService {
       );
       return response.data;
     } catch (error) {
+      if (error.response.data.error === 'not found') {
+        return 'Token not found or not supported';
+      }
+
       this.logger.error('Failed to fetch insiders graph', error);
       throw error;
     }
