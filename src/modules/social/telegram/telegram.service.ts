@@ -340,7 +340,7 @@ export class TelegramService
       if (ctx.callbackQuery && 'data' in ctx.callbackQuery) {
         address = ctx.callbackQuery.data.split(':')[1];
 
-        if (!address) {
+        if (!address || address === 'unknown') {
           return ctx.reply('Token creator is unknown.');
         }
 

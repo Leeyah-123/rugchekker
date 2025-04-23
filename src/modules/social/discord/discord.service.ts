@@ -415,6 +415,12 @@ export class DiscordService extends BasePlatformService {
   private async handleCreatorButton(interaction: ButtonInteraction) {
     try {
       const address = interaction.customId.split(':')[1];
+      if (!address || address === 'unknown') {
+        return interaction.reply({
+          content: 'Token creator is unknown.',
+          ephemeral: true,
+        });
+      }
       await interaction.deferReply();
 
       const report = await this.rugcheckService.getCreatorReport(address);
