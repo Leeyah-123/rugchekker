@@ -142,6 +142,13 @@ export class TelegramService
       await loading.start('Analyzing token security');
 
       const report = await this.rugcheckService.getTokenReport(mintAddress);
+      if (typeof report === 'string') {
+        await loading.stop();
+        return ctx.reply(report, {
+          reply_parameters: replyParams,
+        });
+      }
+
       const aiInsights = await this.aiService.analyzeTokenRisks(report);
       await loading.stop();
 
@@ -294,6 +301,12 @@ export class TelegramService
 
       // Get token info to get creator
       const tokenInfo = await this.rugcheckService.getTokenReport(mintAddress);
+      if (typeof tokenInfo === 'string') {
+        await loading.stop();
+        return ctx.reply(tokenInfo, {
+          reply_parameters: replyParams,
+        });
+      }
 
       const result = await this.rugcheckService.reportToken(mintAddress, {
         creator: tokenInfo.creator,
@@ -550,6 +563,13 @@ export class TelegramService
 
       const graphData =
         await this.rugcheckService.getInsidersGraph(mintAddress);
+      if (typeof graphData === 'string') {
+        await loading.stop();
+        return ctx.reply(graphData, {
+          reply_parameters: replyParams,
+        });
+      }
+
       if (!graphData || graphData.length === 0) {
         await loading.stop();
         return ctx.reply('No insider trading data found for this token\\.', {

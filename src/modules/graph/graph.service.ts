@@ -1,9 +1,10 @@
 import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import * as fs from 'fs';
+import * as https from 'https';
+import { join } from 'path';
 import { InsidersGraphData } from 'src/common/interfaces/rugcheck';
 import { truncateAddress } from 'src/shared/utils';
-import * as path from 'path';
-import * as fs from 'fs/promises';
 
 @Injectable()
 export class GraphService implements OnModuleInit {
@@ -11,24 +12,7 @@ export class GraphService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      // Create fonts directory if it doesn't exist
-      const fontsDir = path.join(process.cwd(), 'assets', 'fonts');
-      await fs.mkdir(fontsDir, { recursive: true });
-
-      // Download Arial font if not exists
-      const arialPath = path.join(fontsDir, 'arial.ttf');
-      if (!GlobalFonts.has('Arial')) {
-        // Download Arial font from Google Fonts (Roboto as fallback)
-        const response = await fetch(
-          'https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf',
-        );
-        const buffer = Buffer.from(await response.arrayBuffer());
-        await fs.writeFile(arialPath, buffer);
-
-        // Register the font
-        GlobalFonts.register(Buffer.from(arialPath));
-        this.logger.log('Arial font registered successfully');
-      }
+      await this.setupFont();
     } catch (error) {
       this.logger.error('Failed to initialize fonts:', error);
       // Continue with fallback system fonts
@@ -316,5 +300,49 @@ export class GraphService implements OnModuleInit {
       this.logger.error('Error generating graph:', error);
       throw new Error('Failed to generate graph');
     }
+  }
+
+  private async setupFont() {
+    const fontDir = join(process.cwd(), 'assets', 'fonts');
+    const fontPath = join(fontDir, 'OpenSans-Regular.ttf');
+
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(fontDir)) {
+      fs.mkdirSync(fontDir, { recursive: true });
+    }
+
+    // Check if font already exists
+    if (!fs.existsSync(fontPath)) {
+      console.log('Downloading font...');
+
+      // Download a free font from Google Fonts
+      const fontUrl =
+        'https://fonts.gstatic.com/s/opensans/v34/memSYaGs126MiZpBA-UvWbX2vVnXBbObj2OVZyOOSr4dVJWUgsjZ0B4gaVc.ttf';
+
+      await new Promise<void>((resolve, reject) => {
+        const file = fs.createWriteStream(fontPath);
+        https
+          .get(fontUrl, (response) => {
+            response.pipe(file);
+            file.on('finish', () => {
+              file.close();
+              console.log('Font downloaded successfully');
+              resolve();
+            });
+          })
+          .on('error', (err) => {
+            fs.unlinkSync(fontPath); // Remove partial file
+            reject(err);
+          });
+      });
+    }
+
+    // Register the font
+    GlobalFonts.registerFromPath(fontPath, 'OpenSans');
+    console.log('Font registered successfully');
+    console.log(
+      'Available fonts:',
+      GlobalFonts.families.map((f) => f.family).join(', '),
+    );
   }
 }
