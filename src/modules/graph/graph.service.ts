@@ -313,7 +313,7 @@ export class GraphService implements OnModuleInit {
 
     // Check if font already exists
     if (!fs.existsSync(fontPath)) {
-      console.log('Downloading font...');
+      this.logger.log('Downloading font...');
 
       // Download a free font from Google Fonts
       const fontUrl =
@@ -326,7 +326,7 @@ export class GraphService implements OnModuleInit {
             response.pipe(file);
             file.on('finish', () => {
               file.close();
-              console.log('Font downloaded successfully');
+              this.logger.log('Font downloaded successfully');
               resolve();
             });
           })
@@ -339,8 +339,8 @@ export class GraphService implements OnModuleInit {
 
     // Register the font
     GlobalFonts.registerFromPath(fontPath, 'OpenSans');
-    console.log('Font registered successfully');
-    console.log(
+    this.logger.log('Font registered successfully');
+    this.logger.log(
       'Available fonts:',
       GlobalFonts.families.map((f) => f.family).join(', '),
     );
