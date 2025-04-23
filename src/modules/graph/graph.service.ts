@@ -1,11 +1,39 @@
-import { createCanvas } from '@napi-rs/canvas';
-import { Injectable, Logger } from '@nestjs/common';
+import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InsidersGraphData } from 'src/common/interfaces/rugcheck';
 import { truncateAddress } from 'src/shared/utils';
+import * as path from 'path';
+import * as fs from 'fs/promises';
 
 @Injectable()
-export class GraphService {
+export class GraphService implements OnModuleInit {
   private readonly logger = new Logger(GraphService.name);
+
+  async onModuleInit() {
+    try {
+      // Create fonts directory if it doesn't exist
+      const fontsDir = path.join(process.cwd(), 'assets', 'fonts');
+      await fs.mkdir(fontsDir, { recursive: true });
+
+      // Download Arial font if not exists
+      const arialPath = path.join(fontsDir, 'arial.ttf');
+      if (!GlobalFonts.has('Arial')) {
+        // Download Arial font from Google Fonts (Roboto as fallback)
+        const response = await fetch(
+          'https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf',
+        );
+        const buffer = Buffer.from(await response.arrayBuffer());
+        await fs.writeFile(arialPath, buffer);
+
+        // Register the font
+        GlobalFonts.register(Buffer.from(arialPath));
+        this.logger.log('Arial font registered successfully');
+      }
+    } catch (error) {
+      this.logger.error('Failed to initialize fonts:', error);
+      // Continue with fallback system fonts
+    }
+  }
 
   async generateInsidersGraph(
     data: InsidersGraphData[],

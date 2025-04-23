@@ -574,9 +574,10 @@ export class TelegramService
           .filter((n) => n.holdings > 0)
           .sort((a, b) => b.holdings - a.holdings)
           .slice(0, 10)
-          .map(
-            (n) =>
-              `[${escapeMarkdown(truncateAddress(n.id))}](${escapeMarkdown(`https://solscan\\.io/account/${n.id}`)}): ${n.holdings} tokens`,
+          .map((n) =>
+            escapeMarkdown(
+              `[${truncateAddress(n.id, 4, 4)}](${escapeMarkdown(`https://solscan.io/account/${n.id}`)}): ${n.holdings}`,
+            ),
           ),
       ].join('\n');
 
