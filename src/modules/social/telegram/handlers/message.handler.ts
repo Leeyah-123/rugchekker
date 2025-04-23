@@ -130,7 +130,7 @@ export function formatTelegramReport(
       [
         {
           text: '👤 Check Creator',
-          callback_data: `check_creator:${report.creator}`,
+          callback_data: `check_creator:${report.creator || 'unknown'}`,
         },
       ],
       [

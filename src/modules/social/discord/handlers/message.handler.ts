@@ -104,7 +104,7 @@ export function formatRiskReport(
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId(`check_creator:${report.creator}`)
+      .setCustomId(`check_creator:${report.creator || 'unknown'}`)
       .setLabel('Check Creator')
       .setStyle(ButtonStyle.Secondary)
       .setEmoji('👤'),
