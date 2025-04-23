@@ -320,7 +320,7 @@ export class TelegramService
   private async handleHelpCommand(ctx: Context) {
     const helpMessage =
       '*🛡️ RugChekker \\- Solana Token Security Bot*\n\n' +
-      'Welcome to RugChekker. Analyze and detect potential risks in Solana tokens before investing\\. ' +
+      'Welcome to RugChekker\\. Analyze and detect potential risks in Solana tokens before investing\\. ' +
       'Get detailed security reports, market metrics, and risk assessments for any token\\.\n\n' +
       '*📊 Available Commands:*\n' +
       '├ /analyze \\<token\\> \\- Get a detailed risk report\n' +
