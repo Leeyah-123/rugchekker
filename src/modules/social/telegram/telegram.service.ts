@@ -112,23 +112,40 @@ export class TelegramService
         );
       }
 
-      await loading.start('Analyzing token security...');
+      await loading.start('Analyzing token security');
+
       const report = await this.rugcheckService.getTokenReport(mintAddress);
       const aiInsights = await this.aiService.analyzeTokenRisks(report);
       await loading.stop();
 
-      const { text, reply_markup } = formatTelegramReport(
+      const { caption, continuation, reply_markup } = formatTelegramReport(
         mintAddress,
         report,
         aiInsights,
       );
 
-      return ctx.replyWithPhoto(report.fileMeta?.image, {
-        caption: text,
+      // Send main message with photo and (1/N) if there are continuations
+      await ctx.replyWithPhoto(report.fileMeta?.image, {
+        caption: continuation?.length
+          ? `${caption}\n\n\\(1/${continuation.length + 1}\\)`
+          : caption,
         parse_mode: 'MarkdownV2',
         reply_markup,
         reply_parameters: replyParams,
       });
+
+      // Send continuation messages if any
+      if (continuation?.length) {
+        for (let i = 0; i < continuation.length; i++) {
+          await ctx.reply(
+            `${continuation[i]}\n\n\\(${i + 2}/${continuation.length + 1}\\)`,
+            {
+              parse_mode: 'MarkdownV2',
+              reply_parameters: replyParams,
+            },
+          );
+        }
+      }
     } catch (err) {
       await loading.stop();
       this.logger.error('Error processing analyze command/callback', err);
@@ -176,7 +193,7 @@ export class TelegramService
       let reportMessage = '';
       let evidence: string | undefined;
 
-      await loading.start('Processing your report...');
+      await loading.start('Processing your report');
 
       // Extract command and content
       const messageText = 'photo' in msg ? msg.caption || '' : msg.text;
