@@ -17,7 +17,6 @@ import {
 import { CreatorReport } from 'src/common/interfaces/rugcheck';
 import { GraphService } from 'src/modules/graph/graph.service';
 import { truncateAddress } from 'src/shared/utils';
-import mockData from '../../../mockData';
 import { AiService } from '../../ai/ai.service';
 import { RugcheckService } from '../../rugcheck/rugcheck.service';
 import { BasePlatformService } from '../base/base.service';
@@ -483,9 +482,8 @@ export class DiscordService extends BasePlatformService {
 
       const loadingMsg = await msg.reply('Generating insiders graph...');
 
-      // const graphData =
-      //   await this.rugcheckService.getInsidersGraph(mintAddress);
-      const graphData = mockData;
+      const graphData =
+        await this.rugcheckService.getInsidersGraph(mintAddress);
       if (!graphData || graphData.length === 0) {
         return this.reply(
           msg.reply.bind(msg),
