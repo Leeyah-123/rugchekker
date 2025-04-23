@@ -1,23 +1,11 @@
-import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import * as fs from 'fs';
-import * as https from 'https';
-import { join } from 'path';
+import { createCanvas } from '@napi-rs/canvas';
+import { Injectable, Logger } from '@nestjs/common';
 import { InsidersGraphData } from 'src/common/interfaces/rugcheck';
 import { truncateAddress } from 'src/shared/utils';
 
 @Injectable()
-export class GraphService implements OnModuleInit {
+export class GraphService {
   private readonly logger = new Logger(GraphService.name);
-
-  async onModuleInit() {
-    try {
-      await this.setupFont();
-    } catch (error) {
-      this.logger.error('Failed to initialize fonts:', error);
-      // Continue with fallback system fonts
-    }
-  }
 
   async generateInsidersGraph(
     data: InsidersGraphData[],
@@ -300,49 +288,5 @@ export class GraphService implements OnModuleInit {
       this.logger.error('Error generating graph:', error);
       throw new Error('Failed to generate graph');
     }
-  }
-
-  private async setupFont() {
-    const fontDir = join(process.cwd(), 'assets', 'fonts');
-    const fontPath = join(fontDir, 'OpenSans-Regular.ttf');
-
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(fontDir)) {
-      fs.mkdirSync(fontDir, { recursive: true });
-    }
-
-    // Check if font already exists
-    if (!fs.existsSync(fontPath)) {
-      this.logger.log('Downloading font...');
-
-      // Download a free font from Google Fonts
-      const fontUrl =
-        'https://fonts.gstatic.com/s/opensans/v34/memSYaGs126MiZpBA-UvWbX2vVnXBbObj2OVZyOOSr4dVJWUgsjZ0B4gaVc.ttf';
-
-      await new Promise<void>((resolve, reject) => {
-        const file = fs.createWriteStream(fontPath);
-        https
-          .get(fontUrl, (response) => {
-            response.pipe(file);
-            file.on('finish', () => {
-              file.close();
-              this.logger.log('Font downloaded successfully');
-              resolve();
-            });
-          })
-          .on('error', (err) => {
-            fs.unlinkSync(fontPath); // Remove partial file
-            reject(err);
-          });
-      });
-    }
-
-    // Register the font
-    GlobalFonts.registerFromPath(fontPath, 'OpenSans');
-    this.logger.log('Font registered successfully');
-    this.logger.log(
-      'Available fonts:',
-      GlobalFonts.families.map((f) => f.family).join(', '),
-    );
   }
 }
