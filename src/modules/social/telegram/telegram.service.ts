@@ -339,16 +339,18 @@ export class TelegramService
       // Handle both command and callback contexts
       if (ctx.callbackQuery && 'data' in ctx.callbackQuery) {
         address = ctx.callbackQuery.data.split(':')[1];
-
-        if (!address || address === 'unknown') {
-          return ctx.reply('Token creator is unknown.');
-        }
-
-        await ctx.answerCbQuery('Analyzing creator...');
         replyParams = {
           message_id: ctx.callbackQuery.message.message_id,
           chat_id: ctx.callbackQuery.message.chat.id,
         };
+
+        if (!address || address === 'unknown') {
+          return ctx.reply('Token creator is unknown', {
+            reply_parameters: replyParams,
+          });
+        }
+
+        await ctx.answerCbQuery('Analyzing creator...');
       } else if (ctx.message && 'text' in ctx.message) {
         const msg = ctx.message.text;
         address = msg.replace(/\/creator\s*/, '');

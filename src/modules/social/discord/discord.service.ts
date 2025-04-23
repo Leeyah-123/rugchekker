@@ -421,8 +421,8 @@ export class DiscordService extends BasePlatformService {
           ephemeral: true,
         });
       }
-      await interaction.deferReply();
 
+      await interaction.deferReply();
       const report = await this.rugcheckService.getCreatorReport(address);
       const { embed } = formatCreatorReport(address, report);
 
