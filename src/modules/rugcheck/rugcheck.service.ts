@@ -76,19 +76,22 @@ export class RugcheckService {
       return response.data;
     } catch (error) {
       if (error instanceof AxiosError) {
-        if (error.response.data.error === 'not found') {
-          return 'Token not found or not supported';
-        }
-
         this.logger.error(
           `RugCheck API error: ${error.response?.status} - ${error.response?.data}`,
         );
-      } else if (error instanceof Error) {
-        this.logger.error(`RugCheck API error: ${error.message}`);
-      } else {
-        this.logger.error('Failed to fetch RugCheck report', error);
+
+        if (
+          error.response.data.error === 'not found' ||
+          error.response.data.error === 'invalid token mint'
+        ) {
+          return 'Token not found or not supported.';
+        }
+
+        return error.response.data.error;
       }
-      throw error;
+
+      this.logger.error(`RugCheck API error: ${error.message}`);
+      return 'An error occurred while fetching the token report.';
     }
   }
 

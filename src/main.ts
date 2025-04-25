@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { setupFont } from './shared/utils';
+import { setupFont } from './shared/utils/font.utils';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
