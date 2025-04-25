@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client, IntentsBitField, Message } from 'discord.js';
 import { GraphService } from 'src/modules/graph/graph.service';
+import { ReportService } from 'src/modules/report/report.service';
 import { VybeService } from 'src/modules/vybe/vybe.service';
+import { WatchService } from 'src/modules/watch/watch.service';
 import { AiService } from '../../ai/ai.service';
 import { RugcheckService } from '../../rugcheck/rugcheck.service';
 import { BasePlatformService } from '../base/base.service';
@@ -20,7 +22,9 @@ export class DiscordService extends BasePlatformService {
     private readonly aiService: AiService,
     private readonly rugcheckService: RugcheckService,
     private readonly graphService: GraphService,
-    private readonly birdeyeService: VybeService,
+    private readonly vybeService: VybeService,
+    private readonly watchService: WatchService,
+    private readonly reportService: ReportService,
   ) {
     super();
     this.client = new Client({
@@ -34,11 +38,14 @@ export class DiscordService extends BasePlatformService {
       this.aiService,
       this.rugcheckService,
       this.graphService,
-      this.birdeyeService,
+      this.vybeService,
+      this.watchService,
+      this.reportService,
     );
     this.interactions = new DiscordInteractions(
       this.aiService,
       this.rugcheckService,
+      this.reportService,
     );
 
     this.client.on('messageCreate', async (message) => {
@@ -56,6 +63,10 @@ export class DiscordService extends BasePlatformService {
         '!insiders': this.commands.handleInsidersCommand.bind(this),
         '!analyze_network':
           this.commands.handleAnalyzeNetworkCommand.bind(this),
+        '!wc': this.commands.handleWatchCreatorCommand.bind(this),
+        '!uc': this.commands.handleUnwatchCreatorCommand.bind(this),
+        '!wt': this.commands.handleWatchTokenCommand.bind(this),
+        '!ut': this.commands.handleUnwatchTokenCommand.bind(this),
       };
 
       const command = message.content.split(' ')[0].toLowerCase();
@@ -127,6 +138,18 @@ export class DiscordService extends BasePlatformService {
         break;
       case '!analyze_network':
         await this.commands.handleAnalyzeNetworkCommand(msg);
+        break;
+      case '!wc':
+        await this.commands.handleWatchCreatorCommand(msg);
+        break;
+      case '!uc':
+        await this.commands.handleUnwatchCreatorCommand(msg);
+        break;
+      case '!wt':
+        await this.commands.handleWatchTokenCommand(msg);
+        break;
+      case '!ut':
+        await this.commands.handleUnwatchTokenCommand(msg);
         break;
       default:
         this.logger.log(`Unknown command: ${command}`);

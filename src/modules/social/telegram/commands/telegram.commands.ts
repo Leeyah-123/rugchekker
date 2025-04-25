@@ -12,6 +12,8 @@ import { BaseCommands } from '../../base/base.commands';
 import { formatTelegramReport } from '../handlers/message.handler';
 import { formatTokensList } from '../handlers/tokens-list.handler';
 import { LoadingMessage } from '../utils/loading.util';
+import { WatchService } from 'src/modules/watch/watch.service';
+import { ReportService } from 'src/modules/report/report.service';
 
 export class TelegramCommands extends BaseCommands {
   constructor(
@@ -19,8 +21,10 @@ export class TelegramCommands extends BaseCommands {
     private readonly config: ConfigService,
     private readonly aiService: AiService,
     private readonly rugcheckService: RugcheckService,
-    private readonly birdeyeService: VybeService,
+    private readonly vybeService: VybeService,
     private readonly graphService: GraphService,
+    private readonly watchService: WatchService,
+    private readonly reportService: ReportService,
   ) {
     super();
   }
@@ -205,7 +209,7 @@ export class TelegramCommands extends BaseCommands {
         });
       }
 
-      const result = await this.rugcheckService.reportToken(mintAddress, {
+      const result = await this.reportService.reportToken(mintAddress, {
         creator: tokenInfo.creator,
         reportedBy: ctx.from?.id.toString(),
         platform: 'telegram',
@@ -245,6 +249,10 @@ export class TelegramCommands extends BaseCommands {
       '├ /recent \\- View most viewed tokens\n' +
       '├ /trending \\- View trending tokens\n' +
       '├ /verified \\- View verified tokens\n' +
+      '├ /wc \\<address\\> \\- Watch a token creator for reports\n' +
+      '├ /uc \\<address\\> \\- Unwatch a token creator\n' +
+      '├ /wt \\<token\\> \\- Watch a token for reports\n' +
+      '├ /ut \\<token\\> \\- Unwatch a token\n' +
       '└ /help \\- Display this help message\n\n' +
       '*🔍 Example Usage:*\n' +
       '/analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN\n\n' +
@@ -397,7 +405,7 @@ export class TelegramCommands extends BaseCommands {
         );
       }
 
-      const report = await this.rugcheckService.getCreatorReport(address);
+      const report = await this.reportService.getCreatorReport(address);
       const messageText =
         `*👤 Creator Report for* \`${address}\`\n\n` +
         `Total Reports: ${report.totalReports}\n` +
@@ -582,7 +590,7 @@ export class TelegramCommands extends BaseCommands {
         return ctx.reply(tokenInfo, { reply_parameters: replyParams });
       }
 
-      const candlestickData = await this.birdeyeService.getTokenOHLCV(
+      const candlestickData = await this.vybeService.getTokenOHLCV(
         mintAddress,
         duration as any,
       );
@@ -626,6 +634,134 @@ export class TelegramCommands extends BaseCommands {
       await loading.stop();
       this.logger.error('Error analyzing network', err);
       return ctx.reply('An error occurred while analyzing the network.', {
+        reply_parameters: replyParams,
+      });
+    }
+  }
+
+  async handleWatchCreatorCommand(ctx: Context) {
+    const parts = ('text' in ctx.message ? ctx.message.text : '')
+      .replace(/^\/wc\s*/, '')
+      .split(' ');
+
+    const address = parts[0];
+    const replyParams = {
+      message_id: ctx.message.message_id,
+      chat_id: ctx.message.chat.id,
+    };
+
+    if (!address || !isValidSolanaAddress(address)) {
+      return ctx.reply('Invalid address format. Usage: wc <address>', {
+        reply_parameters: replyParams,
+      });
+    }
+
+    try {
+      const result = await this.watchService.watchAddress(
+        ctx.from.id.toString(),
+        'telegram',
+        address,
+      );
+      return ctx.reply(result, { reply_parameters: replyParams });
+    } catch (err) {
+      this.logger.error('Error watching address', err);
+      return ctx.reply('An error occurred while setting up the watch.', {
+        reply_parameters: replyParams,
+      });
+    }
+  }
+
+  async handleUnwatchCreatorCommand(ctx: Context) {
+    const parts = ('text' in ctx.message ? ctx.message.text : '')
+      .replace(/^\/uc\s*/, '')
+      .split(' ');
+
+    const address = parts[0];
+    const replyParams = {
+      message_id: ctx.message.message_id,
+      chat_id: ctx.message.chat.id,
+    };
+
+    if (!address || !isValidSolanaAddress(address)) {
+      return ctx.reply('Invalid address format. Usage: /uc <address>', {
+        reply_parameters: replyParams,
+      });
+    }
+
+    try {
+      const result = await this.watchService.unwatchAddress(
+        ctx.from.id.toString(),
+        'telegram',
+        address,
+      );
+      return ctx.reply(result, { reply_parameters: replyParams });
+    } catch (err) {
+      this.logger.error('Error unwatching address', err);
+      return ctx.reply('An error occurred while removing the watch.', {
+        reply_parameters: replyParams,
+      });
+    }
+  }
+
+  async handleWatchTokenCommand(ctx: Context) {
+    const parts = ('text' in ctx.message ? ctx.message.text : '')
+      .replace(/^\/wt\s*/, '')
+      .split(' ');
+
+    const token = parts[0];
+    const replyParams = {
+      message_id: ctx.message.message_id,
+      chat_id: ctx.message.chat.id,
+    };
+
+    if (!token || !isValidSolanaAddress(token)) {
+      return ctx.reply('Invalid token format. Usage: /wt <token>', {
+        reply_parameters: replyParams,
+      });
+    }
+
+    try {
+      const result = await this.watchService.watchToken(
+        ctx.from.id.toString(),
+        'telegram',
+        token,
+      );
+      return ctx.reply(result, { reply_parameters: replyParams });
+    } catch (err) {
+      this.logger.error('Error watching token', err);
+      return ctx.reply('An error occurred while setting up the watch.', {
+        reply_parameters: replyParams,
+      });
+    }
+  }
+
+  async handleUnwatchTokenCommand(ctx: Context) {
+    const parts = ('text' in ctx.message ? ctx.message.text : '')
+      .replace(/^\/ut\s*/, '')
+      .split(' ');
+
+    const token = parts[0];
+    const replyParams = {
+      message_id: ctx.message.message_id,
+      chat_id: ctx.message.chat.id,
+    };
+
+    if (!token || !isValidSolanaAddress(token)) {
+      return ctx.reply('Invalid token format. Usage: /ut <token>', {
+        reply_parameters: replyParams,
+      });
+    }
+
+    try {
+      const result = await this.watchService.unwatchToken(
+        ctx.from.id.toString(),
+        'telegram',
+        token,
+      );
+      return ctx.reply(result, { reply_parameters: replyParams });
+    } catch (err) {
+      this.logger.error('Error unwatching token', err);
+      return ctx.reply('An error occurred while removing the watch.', {
         reply_parameters: replyParams,
       });
     }

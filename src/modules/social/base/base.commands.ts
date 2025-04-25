@@ -12,4 +12,9 @@ export abstract class BaseCommands {
   abstract handleVerifiedCommand(...args: any[]): Promise<any>;
   abstract handleCreatorCommand(...args: any[]): Promise<any>;
   abstract handleInsidersCommand(...args: any[]): Promise<any>;
+  abstract handleAnalyzeNetworkCommand(...args: any[]): Promise<any>;
+  abstract handleWatchCreatorCommand(...args: any[]): Promise<any>;
+  abstract handleUnwatchCreatorCommand(...args: any[]): Promise<any>;
+  abstract handleWatchTokenCommand(...args: any[]): Promise<any>;
+  abstract handleUnwatchTokenCommand(...args: any[]): Promise<any>;
 }
