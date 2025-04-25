@@ -3,22 +3,6 @@ import * as fs from 'fs';
 import * as https from 'https';
 import { join } from 'path';
 
-export const truncateAddress = (
-  address: string,
-  start: number = 6,
-  end: number = 6,
-): string => {
-  if (address.length <= start + end) {
-    return address;
-  }
-  return `${address.slice(0, start)}...${address.slice(-end)}`;
-};
-
-export const escapeMarkdown = (text: string): string => {
-  return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
-};
-
-// Function to download and install a font
 export const setupFont = async () => {
   const fontDir = join(process.cwd(), 'assets', 'fonts');
   const fontPath = join(fontDir, 'OpenSans-Regular.ttf');

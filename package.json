@@ -29,6 +29,7 @@
     "@nestjs/mongoose": "^11.0.3",
     "@nestjs/platform-express": "^10.0.0",
     "axios": "^1.8.4",
+    "bs58": "^6.0.0",
     "discord.js": "^14.18.0",
     "mongoose": "^8.13.2",
     "nestjs-telegraf": "^2.8.1",

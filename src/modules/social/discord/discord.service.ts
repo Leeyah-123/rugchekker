@@ -1,40 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  ActionRowBuilder,
-  ButtonInteraction,
-  Client,
-  EmbedBuilder,
-  escapeMarkdown,
-  IntentsBitField,
-  Message,
-  MessageFlags,
-  ModalBuilder,
-  ModalSubmitInteraction,
-  TextInputBuilder,
-  TextInputStyle,
-} from 'discord.js';
-import { CreatorReport } from 'src/common/interfaces/rugcheck';
+import { Client, IntentsBitField, Message } from 'discord.js';
 import { GraphService } from 'src/modules/graph/graph.service';
-import { truncateAddress } from 'src/shared/utils';
+import { VybeService } from 'src/modules/vybe/vybe.service';
 import { AiService } from '../../ai/ai.service';
 import { RugcheckService } from '../../rugcheck/rugcheck.service';
 import { BasePlatformService } from '../base/base.service';
-import {
-  formatCreatorReport,
-  formatRiskReport,
-} from './handlers/message.handler';
-import { formatTokensList } from './handlers/tokens-list.handler';
+import { DiscordCommands } from './commands/discord.commands';
+import { DiscordInteractions } from './interactions/discord.interactions';
 
 @Injectable()
 export class DiscordService extends BasePlatformService {
   private client: Client;
+  private readonly commands: DiscordCommands;
+  private readonly interactions: DiscordInteractions;
 
   constructor(
     private readonly config: ConfigService,
     private readonly aiService: AiService,
     private readonly rugcheckService: RugcheckService,
     private readonly graphService: GraphService,
+    private readonly birdeyeService: VybeService,
   ) {
     super();
     this.client = new Client({
@@ -44,20 +30,32 @@ export class DiscordService extends BasePlatformService {
         IntentsBitField.Flags.MessageContent,
       ],
     });
+    this.commands = new DiscordCommands(
+      this.aiService,
+      this.rugcheckService,
+      this.graphService,
+      this.birdeyeService,
+    );
+    this.interactions = new DiscordInteractions(
+      this.aiService,
+      this.rugcheckService,
+    );
 
     this.client.on('messageCreate', async (message) => {
       if (message.author.bot) return;
 
       const commandMap = {
-        '!analyze': this.handleAnalyzeCommand.bind(this),
-        '!report': this.handleReportCommand.bind(this),
-        '!creator': this.handleCreatorCommand.bind(this),
-        '!help': this.handleHelpCommand.bind(this),
-        '!new_tokens': this.handleNewTokens.bind(this),
-        '!recent': this.handleRecent.bind(this),
-        '!trending': this.handleTrending.bind(this),
-        '!verified': this.handleVerified.bind(this),
-        '!insiders': this.handleInsidersCommand.bind(this),
+        '!analyze': this.commands.handleAnalyzeCommand.bind(this),
+        '!report': this.commands.handleReportCommand.bind(this),
+        '!creator': this.commands.handleCreatorCommand.bind(this),
+        '!help': this.commands.handleHelpCommand.bind(this),
+        '!new_tokens': this.commands.handleNewTokensCommand.bind(this),
+        '!recent': this.commands.handleRecentCommand.bind(this),
+        '!trending': this.commands.handleTrendingCommand.bind(this),
+        '!verified': this.commands.handleVerifiedCommand.bind(this),
+        '!insiders': this.commands.handleInsidersCommand.bind(this),
+        '!analyze_network':
+          this.commands.handleAnalyzeNetworkCommand.bind(this),
       };
 
       const command = message.content.split(' ')[0].toLowerCase();
@@ -69,15 +67,15 @@ export class DiscordService extends BasePlatformService {
     this.client.on('interactionCreate', async (interaction) => {
       if (interaction.isButton()) {
         if (interaction.customId.startsWith('report_token:')) {
-          await this.handleReportButton(interaction);
+          await this.interactions.handleReportButton(interaction);
         } else if (interaction.customId.startsWith('check_creator:')) {
-          await this.handleCreatorButton(interaction);
+          await this.interactions.handleCreatorButton(interaction);
         } else if (interaction.customId.startsWith('analyze_token:')) {
-          await this.handleAnalyzeButton(interaction);
+          await this.interactions.handleAnalyzeButton(interaction);
         }
       } else if (interaction.isModalSubmit()) {
         if (interaction.customId.startsWith('report_modal:')) {
-          await this.handleReportModalSubmit(interaction);
+          await this.interactions.handleReportModalSubmit(interaction);
         }
       }
     });
@@ -101,490 +99,41 @@ export class DiscordService extends BasePlatformService {
     const command = msg.content.split(' ')[0].toLowerCase();
     switch (command) {
       case '!analyze':
-        await this.handleAnalyzeCommand(msg);
+        await this.commands.handleAnalyzeCommand(msg);
         break;
       case '!report':
-        await this.handleReportCommand(msg);
+        await this.commands.handleReportCommand(msg);
         break;
       case '!help':
-        await this.handleHelpCommand(msg);
+        await this.commands.handleHelpCommand(msg);
         break;
       case '!new_tokens':
-        await this.handleNewTokens(msg);
+        await this.commands.handleNewTokensCommand(msg);
         break;
       case '!recent':
-        await this.handleRecent(msg);
+        await this.commands.handleRecentCommand(msg);
         break;
       case '!trending':
-        await this.handleTrending(msg);
+        await this.commands.handleTrendingCommand(msg);
         break;
       case '!verified':
-        await this.handleVerified(msg);
+        await this.commands.handleVerifiedCommand(msg);
         break;
       case '!creator':
-        await this.handleCreatorCommand(msg);
+        await this.commands.handleCreatorCommand(msg);
+        break;
+      case '!insiders':
+        await this.commands.handleInsidersCommand(msg);
+        break;
+      case '!analyze_network':
+        await this.commands.handleAnalyzeNetworkCommand(msg);
+        break;
+      default:
+        this.logger.log(`Unknown command: ${command}`);
+        await msg.reply({
+          content: 'Unknown command. Use !help for a list of commands.',
+        });
         break;
     }
-  }
-
-  private async handleAnalyzeCommand(msg: Message) {
-    const query = msg.content.replace(/^!analyze\s*/, '');
-
-    if (!query) {
-      return this.reply(
-        msg.reply.bind(msg),
-        'Invalid command. Usage: !analyze <token>\nExample: !analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
-      );
-    }
-
-    try {
-      const mintAddress = query;
-      const name = '';
-
-      const report = await this.rugcheckService.getTokenReport(mintAddress);
-      if (typeof report === 'string') {
-        return this.reply(msg.reply.bind(msg), report);
-      }
-
-      const aiInsights = await this.aiService.analyzeTokenRisks(report);
-      const { embed, components } = formatRiskReport(
-        name || mintAddress,
-        report,
-        aiInsights,
-      );
-      return this.reply(msg.reply.bind(msg), { embeds: [embed], components });
-    } catch (err) {
-      this.logger.error('Error handling analyze command', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while processing your request.',
-      );
-    }
-  }
-
-  private async handleReportCommand(msg: Message) {
-    const loading = await msg.reply('Processing your report...');
-    try {
-      const parts = msg.content.replace(/^!report\s*/, '').split(' ');
-      const mintAddress = parts[0];
-      const reason = parts.slice(1).join(' ');
-
-      if (!mintAddress || !reason) {
-        return loading.edit(
-          'Invalid command. Usage: !report <token> <reason>\nExample: !report JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN Suspicious activity',
-        );
-      }
-
-      const tokenInfo = await this.rugcheckService.getTokenReport(mintAddress);
-      if (typeof tokenInfo === 'string') {
-        return loading.edit(tokenInfo);
-      }
-
-      const result = await this.rugcheckService.reportToken(mintAddress, {
-        creator: tokenInfo.creator,
-        reportedBy: msg.author.id,
-        platform: 'discord',
-        message: reason,
-        evidence: msg.attachments.first()?.url,
-      });
-
-      await loading.edit(result.message);
-    } catch (err) {
-      this.logger.error('Error handling report command', err);
-      await loading.edit('An error occurred while reporting the token.');
-    }
-  }
-
-  private async handleHelpCommand(msg: Message) {
-    const embed = new EmbedBuilder()
-      .setTitle('🛡️ RugChekker - Solana Token Security Bot')
-      .setDescription(
-        'Welcome to RugChekker. Analyze and detect potential risks in Solana tokens before investing.' +
-          'Get detailed security reports, market metrics, and risk assessments for any token.',
-      )
-      .addFields({
-        name: '📊 Available Commands',
-        value:
-          '`!analyze <token>` - Get a detailed risk report\n' +
-          '`!report <token> <reason> [Attachment (optional)]` - Report a suspicious token\n' +
-          '`!creator <address>` - Get creator report\n' +
-          '`!insiders <token> [participants]` - View insider trading network\n' +
-          '`!new_tokens` - View recently created tokens\n' +
-          '`!recent` - View most viewed tokens\n' +
-          '`!trending` - View trending tokens\n' +
-          '`!verified` - View verified tokens\n' +
-          '`!help` - Display this help message',
-      })
-      .addFields({
-        name: '🔍 Example Usage',
-        value: '`!analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN`',
-      })
-      .setColor(0x4a90e2)
-      .setFooter({ text: 'Stay safe with RugChekker' });
-
-    return msg.reply({ embeds: [embed] });
-  }
-
-  private async handleNewTokens(msg: Message) {
-    try {
-      const tokens = await this.rugcheckService.getNewTokens();
-      const { embed, components } = formatTokensList(
-        '🆕 Recently Created Tokens',
-        tokens,
-      );
-      return this.reply(msg.reply.bind(msg), { embeds: [embed], components });
-    } catch (err) {
-      this.logger.error('Error fetching new tokens', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while fetching new tokens.',
-      );
-    }
-  }
-
-  private async handleRecent(msg: Message) {
-    try {
-      const tokens = await this.rugcheckService.getRecentTokens();
-      const { embed, components } = formatTokensList(
-        '👀 Most Viewed Tokens',
-        tokens,
-      );
-      return this.reply(msg.reply.bind(msg), { embeds: [embed], components });
-    } catch (err) {
-      this.logger.error('Error fetching recent tokens', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while fetching recent tokens.',
-      );
-    }
-  }
-
-  private async handleTrending(msg: Message) {
-    try {
-      const tokens = await this.rugcheckService.getTrendingTokens();
-      const { embed, components } = formatTokensList(
-        '🔥 Trending Tokens',
-        tokens,
-      );
-      return this.reply(msg.reply.bind(msg), { embeds: [embed], components });
-    } catch (err) {
-      this.logger.error('Error fetching trending tokens', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while fetching trending tokens.',
-      );
-    }
-  }
-
-  private async handleVerified(msg: Message) {
-    try {
-      const tokens = await this.rugcheckService.getVerifiedTokens();
-      const { embed, components } = formatTokensList(
-        '✅ Recently Verified Tokens',
-        tokens,
-      );
-      return this.reply(msg.reply.bind(msg), { embeds: [embed], components });
-    } catch (err) {
-      this.logger.error('Error fetching verified tokens', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while fetching verified tokens.',
-      );
-    }
-  }
-
-  private async handleReportButton(interaction: ButtonInteraction) {
-    try {
-      const mintAddress = interaction.customId.split(':')[1];
-
-      const modal = new ModalBuilder()
-        .setCustomId(`report_modal:${mintAddress}`)
-        .setTitle('Report Token')
-        .addComponents([
-          new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder()
-              .setCustomId('report_reason')
-              .setLabel('Why are you reporting this token?')
-              .setStyle(TextInputStyle.Paragraph)
-              .setRequired(true)
-              .setMinLength(10)
-              .setMaxLength(1000)
-              .setPlaceholder('Describe why you are reporting this token...'),
-          ),
-        ]);
-
-      await interaction.showModal(modal);
-    } catch (err) {
-      this.logger.error('Error showing report modal', err);
-      await interaction.reply({
-        content: 'An error occurred while creating the report form.',
-        flags: MessageFlags.Ephemeral,
-      });
-    }
-  }
-
-  private async handleReportModalSubmit(interaction: ModalSubmitInteraction) {
-    try {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-      const [, mintAddress] = interaction.customId.split(':');
-      const reason = interaction.fields.getTextInputValue('report_reason');
-
-      // Ask for optional evidence
-      await interaction.editReply({
-        content:
-          'Please upload any evidence (images, documents) or type "skip" to submit without evidence. You have 2 minutes to respond.',
-      });
-
-      // Wait for file attachment or skip message
-      const messageFilter = (m: Message) =>
-        m.author.id === interaction.user.id &&
-        (m.attachments.size > 0 || m.content.toLowerCase() === 'skip');
-
-      let evidence: string | undefined;
-
-      try {
-        const collected = await interaction.channel?.awaitMessages({
-          filter: messageFilter,
-          max: 1,
-          time: 120000,
-          errors: ['time'],
-        });
-
-        const attachmentMessage = collected?.first();
-        if (attachmentMessage) {
-          if (attachmentMessage.content.toLowerCase() !== 'skip') {
-            evidence = attachmentMessage.attachments.first()?.url;
-            await interaction.editReply({
-              content: 'Evidence received. Processing your report...',
-            });
-          } else {
-            await interaction.editReply({
-              content: 'Processing report without evidence...',
-            });
-          }
-          // Clean up user's response
-          await attachmentMessage.delete().catch(() => {});
-        }
-      } catch (err) {
-        this.logger.error('Error collecting evidence', err);
-        await interaction.editReply({
-          content:
-            'No evidence provided within time limit. Processing report without evidence...',
-        });
-      }
-
-      // Get token info to get creator
-      const tokenInfo = await this.rugcheckService.getTokenReport(mintAddress);
-      if (typeof tokenInfo === 'string') {
-        return interaction.editReply(tokenInfo);
-      }
-
-      const result = await this.rugcheckService.reportToken(mintAddress, {
-        creator: tokenInfo.creator,
-        reportedBy: interaction.user.id,
-        platform: 'discord',
-        message: reason,
-        evidence,
-      });
-
-      // Final update with result
-      await interaction.editReply({
-        content: `${result.message}${evidence ? '\n\nEvidence has been attached to your report.' : ''}`,
-      });
-    } catch (err) {
-      this.logger.error('Error processing report modal', err);
-      if (interaction.replied || interaction.deferred) {
-        await interaction.editReply({
-          content: 'An error occurred while submitting your report.',
-        });
-      } else {
-        await interaction.reply({
-          content: 'An error occurred while submitting your report.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-    }
-  }
-
-  private async handleCreatorCommand(msg: Message) {
-    try {
-      const address = msg.content.replace(/^!creator\s*/, '');
-      if (!address) {
-        return this.reply(
-          msg.reply.bind(msg),
-          'Invalid command. Usage: !creator <address>\nExample: !creator 7WNRFqMpvqXGi6ytz36fS9tWzNh4ptpkCzASREDBBYoi',
-        );
-      }
-
-      const report = await this.rugcheckService.getCreatorReport(address);
-      const { embed } = this.formatCreatorReport(address, report);
-      return this.reply(msg.reply.bind(msg), { embeds: [embed] });
-    } catch (err) {
-      this.logger.error('Error handling creator command', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while fetching creator report.',
-      );
-    }
-  }
-
-  private async handleCreatorButton(interaction: ButtonInteraction) {
-    try {
-      const address = interaction.customId.split(':')[1];
-      if (!address || address === 'unknown') {
-        return interaction.reply({
-          content: 'Token creator is unknown.',
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      await interaction.deferReply();
-      const report = await this.rugcheckService.getCreatorReport(address);
-      const { embed } = formatCreatorReport(address, report);
-
-      await interaction.editReply({ embeds: [embed] });
-    } catch (err) {
-      this.logger.error('Error processing creator button', err);
-      await interaction.editReply(
-        'An error occurred while fetching creator report.',
-      );
-    }
-  }
-
-  private async handleAnalyzeButton(interaction: ButtonInteraction) {
-    try {
-      const mintAddress = interaction.customId.split(':')[1];
-
-      await interaction.deferReply();
-      const report = await this.rugcheckService.getTokenReport(mintAddress);
-      if (typeof report === 'string') {
-        return interaction.editReply(report);
-      }
-
-      const aiInsights = await this.aiService.analyzeTokenRisks(report);
-      const { embed, components } = formatRiskReport(
-        mintAddress,
-        report,
-        aiInsights,
-      );
-
-      await interaction.editReply({ embeds: [embed], components });
-    } catch (err) {
-      this.logger.error('Error processing analyze button', err);
-      await interaction.editReply(
-        'An error occurred while analyzing the token.',
-      );
-    }
-  }
-
-  private async handleInsidersCommand(msg: Message) {
-    try {
-      const parts = msg.content.replace(/^!insiders\s*/, '').split(' ');
-      const mintAddress = parts[0];
-      const participantsOnly = parts[1]?.toLowerCase() === 'participants';
-
-      if (!mintAddress) {
-        return this.reply(
-          msg.reply.bind(msg),
-          'Invalid command. Usage:\n' +
-            '!insiders <token> [participants]\n\n' +
-            'Examples:\n' +
-            '!insiders JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN\n' +
-            '!insiders JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN participants',
-        );
-      }
-
-      const loadingMsg = await msg.reply('Generating insiders graph...');
-
-      const graphData =
-        await this.rugcheckService.getInsidersGraph(mintAddress);
-      if (typeof graphData === 'string') {
-        return this.reply(msg.reply.bind(msg), graphData);
-      }
-
-      if (!graphData || graphData.length === 0) {
-        return this.reply(
-          msg.reply.bind(msg),
-          'No insider data found for this token.',
-        );
-      }
-      const imageBuffer = await this.graphService.generateInsidersGraph(
-        graphData as any,
-        participantsOnly,
-      );
-
-      const embed = new EmbedBuilder()
-        .setTitle('Insider Trade Network Analysis')
-        .setDescription(
-          `Mode: ${participantsOnly ? 'Participants Only' : 'All Accounts'}`,
-        )
-        .setColor(0x4a90e2)
-        .setImage('attachment://insiders.png');
-
-      // Include holders information
-      const nodes = graphData.flatMap((item) => item.nodes);
-      const holders = nodes
-        .filter((n) => n.holdings > 0)
-        .sort((a, b) => b.holdings - a.holdings)
-        .slice(0, 10);
-
-      if (holders.length > 0) {
-        embed.addFields({
-          name: '🔝 Top Insider Holders',
-          value: holders
-            .map((n) =>
-              escapeMarkdown(
-                `[${truncateAddress(n.id, 4, 4)}](https://solscan.io/account/${n.id}): ${n.holdings}`,
-              ),
-            )
-            .join('\n'),
-        });
-      }
-
-      await loadingMsg.delete();
-
-      return msg.reply({
-        embeds: [embed],
-        files: [{ attachment: imageBuffer, name: 'insiders.png' }],
-      });
-    } catch (err) {
-      this.logger.error('Error generating insiders graph', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while generating the insiders graph.',
-      );
-    }
-  }
-
-  private formatCreatorReport(address: string, report: CreatorReport) {
-    const embed = new EmbedBuilder()
-      .setTitle(`👤 Creator Report: ${address}`)
-      .setDescription(
-        `Total Reports: ${report.totalReports}\nUnique Tokens Reported: ${report.uniqueTokensReported}`,
-      )
-      .setColor(report.totalReports > 0 ? 0xff0000 : 0x00ff00);
-
-    if (report.reports.length > 0) {
-      embed.addFields({
-        name: '🚨 Recent Reports',
-        value: report.reports
-          .slice(0, 5)
-          .map((r) => {
-            const evidenceLink = r.evidence
-              ? `\n[View Evidence](${r.evidence})`
-              : '';
-            return `**Token:** \`${r.mint}\`\n${r.message}${evidenceLink}`;
-          })
-          .join('\n\n'),
-      });
-    } else {
-      embed.addFields({
-        name: '✅ No Reports',
-        value: 'No reports found for this creator',
-      });
-    }
-
-    return { embed };
   }
 }

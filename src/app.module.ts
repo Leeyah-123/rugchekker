@@ -4,10 +4,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AiModule } from './modules/ai/ai.module';
+import { GraphModule } from './modules/graph/graph.module';
 import { RugcheckModule } from './modules/rugcheck/rugcheck.module';
 import { SocialModule } from './modules/social/social.module';
-import { GraphService } from './modules/graph/graph.service';
-import { GraphModule } from './modules/graph/graph.module';
+import { VybeModule } from './modules/vybe/vybe.module';
 
 @Module({
   imports: [
@@ -29,8 +29,9 @@ import { GraphModule } from './modules/graph/graph.module';
     RugcheckModule,
     SocialModule,
     GraphModule,
+    VybeModule,
   ],
   controllers: [AppController],
-  providers: [AppService, GraphService],
+  providers: [AppService],
 })
 export class AppModule {}

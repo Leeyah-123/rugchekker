@@ -289,4 +289,126 @@ export class GraphService {
       throw new Error('Failed to generate graph');
     }
   }
+
+  async generateCandlestickGraph(
+    data: any[],
+    symbol: string,
+    duration: string,
+  ): Promise<Buffer> {
+    try {
+      const canvas = createCanvas(1200, 800);
+      const ctx = canvas.getContext('2d');
+
+      // Set white background
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Calculate scaling factors
+      const padding = 60;
+      const chartWidth = canvas.width - padding * 2;
+      const chartHeight = canvas.height - padding * 2;
+
+      const prices = data.flatMap((candle) => [candle.high, candle.low]);
+      const maxPrice = Math.max(...prices);
+      const minPrice = Math.min(...prices);
+      const priceRange = maxPrice - minPrice;
+
+      const volumes = data.map((candle) => candle.volume);
+      const maxVolume = Math.max(...volumes);
+
+      // Draw candlesticks
+      const candleWidth = (chartWidth / data.length) * 0.8;
+      data.forEach((candle, i) => {
+        const x = padding + (chartWidth * i) / data.length;
+        const open =
+          chartHeight -
+          ((candle.open - minPrice) / priceRange) * chartHeight +
+          padding;
+        const close =
+          chartHeight -
+          ((candle.close - minPrice) / priceRange) * chartHeight +
+          padding;
+        const high =
+          chartHeight -
+          ((candle.high - minPrice) / priceRange) * chartHeight +
+          padding;
+        const low =
+          chartHeight -
+          ((candle.low - minPrice) / priceRange) * chartHeight +
+          padding;
+
+        // Draw volume bars
+        const volumeHeight = (candle.volume / maxVolume) * (chartHeight * 0.2);
+        ctx.fillStyle =
+          candle.close >= candle.open
+            ? 'rgba(0, 255, 0, 0.5)'
+            : 'rgba(255, 0, 0, 0.5)';
+        ctx.fillRect(
+          x,
+          canvas.height - padding - volumeHeight,
+          candleWidth,
+          volumeHeight,
+        );
+
+        // Draw candlestick
+        ctx.strokeStyle = 'black';
+        ctx.beginPath();
+        ctx.moveTo(x + candleWidth / 2, high);
+        ctx.lineTo(x + candleWidth / 2, low);
+        ctx.stroke();
+
+        ctx.fillStyle = candle.close >= candle.open ? 'green' : 'red';
+        ctx.fillRect(
+          x,
+          Math.min(open, close),
+          candleWidth,
+          Math.abs(close - open),
+        );
+      });
+
+      // Draw axes
+      ctx.strokeStyle = 'black';
+      ctx.beginPath();
+      ctx.moveTo(padding, padding);
+      ctx.lineTo(padding, canvas.height - padding);
+      ctx.lineTo(canvas.width - padding, canvas.height - padding);
+      ctx.stroke();
+
+      // Add labels
+      ctx.font = 'bold 16px OpenSans';
+      ctx.fillStyle = 'black';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        `${symbol} Price Chart (${duration})`,
+        canvas.width / 2,
+        padding / 2,
+      );
+
+      // Price labels
+      ctx.textAlign = 'right';
+      ctx.font = '12px OpenSans';
+      for (let i = 0; i <= 5; i++) {
+        const price = minPrice + (priceRange * i) / 5;
+        const y = chartHeight - (chartHeight * i) / 5 + padding;
+        ctx.fillText(`$${price.toFixed(4)}`, padding - 5, y + 4);
+      }
+
+      // Time labels
+      ctx.textAlign = 'center';
+      for (let i = 0; i < data.length; i += Math.floor(data.length / 5)) {
+        const x = padding + (chartWidth * i) / data.length;
+        const date = new Date(data[i].timestamp);
+        ctx.fillText(
+          date.toLocaleTimeString(),
+          x,
+          canvas.height - padding + 20,
+        );
+      }
+
+      return canvas.toBuffer('image/png');
+    } catch (error) {
+      this.logger.error('Error generating candlestick graph:', error);
+      throw new Error('Failed to generate candlestick graph');
+    }
+  }
 }
