@@ -2,20 +2,24 @@ import { EmbedBuilder, escapeMarkdown, Message } from 'discord.js';
 import { CreatorReport } from 'src/common/interfaces/rugcheck';
 import { AiService } from 'src/modules/ai/ai.service';
 import { GraphService } from 'src/modules/graph/graph.service';
+import { ReportService } from 'src/modules/report/report.service';
 import { RugcheckService } from 'src/modules/rugcheck/rugcheck.service';
 import { VybeService } from 'src/modules/vybe/vybe.service';
-import { truncateAddress } from 'src/shared/utils';
+import { WatchService } from 'src/modules/watch/watch.service';
+import { SUPPORTED_OHLCV_DURATIONS } from 'src/shared/constants';
+import { isValidSolanaAddress, truncateAddress } from 'src/shared/utils';
 import { BaseCommands } from '../../base/base.commands';
 import { formatRiskReport } from '../handlers/message.handler';
 import { formatTokensList } from '../handlers/tokens-list.handler';
-import { SUPPORTED_OHLCV_DURATIONS } from 'src/shared/constants';
 
 export class DiscordCommands extends BaseCommands {
   constructor(
     private readonly aiService: AiService,
     private readonly rugcheckService: RugcheckService,
     private readonly graphService: GraphService,
-    private readonly birdeyeService: VybeService,
+    private readonly vybeService: VybeService,
+    private readonly watchService: WatchService,
+    private readonly reportService: ReportService,
   ) {
     super();
   }
@@ -73,7 +77,7 @@ export class DiscordCommands extends BaseCommands {
         return loading.edit(tokenInfo);
       }
 
-      const result = await this.rugcheckService.reportToken(mintAddress, {
+      const result = await this.reportService.reportToken(mintAddress, {
         creator: tokenInfo.creator,
         reportedBy: msg.author.id,
         platform: 'discord',
@@ -110,7 +114,11 @@ export class DiscordCommands extends BaseCommands {
           '`!recent` - View most viewed tokens\n' +
           '`!trending` - View trending tokens\n' +
           '`!verified` - View verified tokens\n' +
-          '`!help` - Display this help message',
+          '`!help` - Display this help message\n' +
+          '`!wc <address>` - Watch a token creator for reports\n' +
+          '`!uc <address>` - Unwatch a token creator address\n' +
+          '`!wt <token>` - Watch a token for reports\n' +
+          '`!ut <token>` - Unwatch a token',
       })
       .addFields({
         name: '🔍 Example Usage',
@@ -279,7 +287,7 @@ export class DiscordCommands extends BaseCommands {
         );
       }
 
-      const report = await this.rugcheckService.getCreatorReport(address);
+      const report = await this.reportService.getCreatorReport(address);
       const { embed } = this.formatCreatorReport(address, report);
       return this.reply(msg.reply.bind(msg), { embeds: [embed] });
     } catch (err) {
@@ -339,7 +347,7 @@ export class DiscordCommands extends BaseCommands {
         return;
       }
 
-      const candlestickData = await this.birdeyeService.getTokenOHLCV(
+      const candlestickData = await this.vybeService.getTokenOHLCV(
         mintAddress,
         duration as any,
       );
@@ -379,6 +387,114 @@ export class DiscordCommands extends BaseCommands {
       return this.reply(
         msg.reply.bind(msg),
         'An error occurred while analyzing the network.',
+      );
+    }
+  }
+
+  async handleWatchCreatorCommand(msg: Message) {
+    try {
+      const parts = msg.content.replace(/^!wc\s*/, '').split(' ');
+      const address = parts[0];
+
+      if (!address || !isValidSolanaAddress(address)) {
+        return this.reply(
+          msg.reply.bind(msg),
+          'Invalid address format. Usage: !wc <address>',
+        );
+      }
+
+      const result = await this.watchService.watchAddress(
+        msg.author.id,
+        'discord',
+        address,
+      );
+      return this.reply(msg.reply.bind(msg), result);
+    } catch (err) {
+      this.logger.error('Error watching address', err);
+      return this.reply(
+        msg.reply.bind(msg),
+        'An error occurred while setting up the watch.',
+      );
+    }
+  }
+
+  async handleUnwatchCreatorCommand(msg: Message) {
+    try {
+      const parts = msg.content.replace(/^uc\s*/, '').split(' ');
+      const address = parts[0];
+
+      if (!address || !isValidSolanaAddress(address)) {
+        return this.reply(
+          msg.reply.bind(msg),
+          'Invalid address format. Usage: !uc <address>',
+        );
+      }
+
+      const result = await this.watchService.unwatchAddress(
+        msg.author.id,
+        'discord',
+        address,
+      );
+      return this.reply(msg.reply.bind(msg), result);
+    } catch (err) {
+      this.logger.error('Error unwatching address', err);
+      return this.reply(
+        msg.reply.bind(msg),
+        'An error occurred while removing the watch.',
+      );
+    }
+  }
+
+  async handleWatchTokenCommand(msg: Message) {
+    try {
+      const parts = msg.content.replace(/^!wt\s*/, '').split(' ');
+      const token = parts[0];
+
+      if (!token || !isValidSolanaAddress(token)) {
+        return this.reply(
+          msg.reply.bind(msg),
+          'Invalid token format. Usage: !wt <token>',
+        );
+      }
+
+      const result = await this.watchService.watchToken(
+        msg.author.id,
+        'discord',
+        token,
+      );
+      return this.reply(msg.reply.bind(msg), result);
+    } catch (err) {
+      this.logger.error('Error watching token', err);
+      return this.reply(
+        msg.reply.bind(msg),
+        'An error occurred while setting up the watch.',
+      );
+    }
+  }
+
+  async handleUnwatchTokenCommand(msg: Message) {
+    try {
+      const parts = msg.content.replace(/^!ut\s*/, '').split(' ');
+      const token = parts[0];
+
+      if (!token || !isValidSolanaAddress(token)) {
+        return this.reply(
+          msg.reply.bind(msg),
+          'Invalid token format. Usage: !ut <token>',
+        );
+      }
+
+      const result = await this.watchService.unwatchToken(
+        msg.author.id,
+        'discord',
+        token,
+      );
+      return this.reply(msg.reply.bind(msg), result);
+    } catch (err) {
+      this.logger.error('Error unwatching token', err);
+      return this.reply(
+        msg.reply.bind(msg),
+        'An error occurred while removing the watch.',
       );
     }
   }

@@ -1,6 +1,8 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ReportService } from 'src/modules/report/report.service';
 import { VybeService } from 'src/modules/vybe/vybe.service';
+import { WatchService } from 'src/modules/watch/watch.service';
 import { Context, Telegraf } from 'telegraf';
 import { AiService } from '../../ai/ai.service';
 import { GraphService } from '../../graph/graph.service';
@@ -20,8 +22,10 @@ export class TelegramService
     private readonly config: ConfigService,
     private readonly aiService: AiService,
     private readonly rugcheckService: RugcheckService,
-    private readonly birdeyeService: VybeService,
+    private readonly vybeService: VybeService,
     private readonly graphService: GraphService,
+    private readonly watchService: WatchService,
+    private readonly reportService: ReportService,
   ) {
     super();
 
@@ -45,8 +49,10 @@ export class TelegramService
       this.config,
       this.aiService,
       this.rugcheckService,
-      this.birdeyeService,
+      this.vybeService,
       this.graphService,
+      this.watchService,
+      this.reportService,
     );
 
     this.bot.command('help', (ctx) => this.commands.handleHelpCommand(ctx));
@@ -86,6 +92,17 @@ export class TelegramService
     );
     this.bot.command('analyze_network', (ctx) =>
       this.commands.handleAnalyzeNetworkCommand(ctx),
+    );
+
+    this.bot.command('wc', (ctx) =>
+      this.commands.handleWatchCreatorCommand(ctx),
+    );
+    this.bot.command('uc', (ctx) =>
+      this.commands.handleUnwatchCreatorCommand(ctx),
+    );
+    this.bot.command('wt', (ctx) => this.commands.handleWatchTokenCommand(ctx));
+    this.bot.command('ut', (ctx) =>
+      this.commands.handleUnwatchTokenCommand(ctx),
     );
 
     // Add photo message handler

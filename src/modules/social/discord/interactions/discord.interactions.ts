@@ -10,6 +10,7 @@ import {
   TextInputStyle,
 } from 'discord.js';
 import { AiService } from 'src/modules/ai/ai.service';
+import { ReportService } from 'src/modules/report/report.service';
 import { RugcheckService } from 'src/modules/rugcheck/rugcheck.service';
 import {
   formatCreatorReport,
@@ -22,6 +23,7 @@ export class DiscordInteractions {
   constructor(
     private readonly aiService: AiService,
     private readonly rugcheckService: RugcheckService,
+    private readonly reportService: ReportService,
   ) {}
 
   async handleReportButton(interaction: ButtonInteraction) {
@@ -111,7 +113,7 @@ export class DiscordInteractions {
         return interaction.editReply(tokenInfo);
       }
 
-      const result = await this.rugcheckService.reportToken(mintAddress, {
+      const result = await this.reportService.reportToken(mintAddress, {
         creator: tokenInfo.creator,
         reportedBy: interaction.user.id,
         platform: 'discord',
@@ -149,7 +151,7 @@ export class DiscordInteractions {
       }
 
       await interaction.deferReply();
-      const report = await this.rugcheckService.getCreatorReport(address);
+      const report = await this.reportService.getCreatorReport(address);
       const { embed } = formatCreatorReport(address, report);
 
       await interaction.editReply({ embeds: [embed] });

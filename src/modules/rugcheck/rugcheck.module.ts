@@ -5,6 +5,12 @@ import {
   TokenReport,
   TokenReportSchema,
 } from '../../schemas/token-report.schema';
+import {
+  WatchSubscription,
+  WatchSubscriptionSchema,
+} from '../../schemas/watch-subscription.schema';
+import { ReportService } from '../report/report.service';
+import { WatchService } from '../watch/watch.service';
 import { RugcheckService } from './rugcheck.service';
 
 @Module({
@@ -12,9 +18,10 @@ import { RugcheckService } from './rugcheck.service';
     HttpModule,
     MongooseModule.forFeature([
       { name: TokenReport.name, schema: TokenReportSchema },
+      { name: WatchSubscription.name, schema: WatchSubscriptionSchema },
     ]),
   ],
-  providers: [RugcheckService],
-  exports: [RugcheckService],
+  providers: [RugcheckService, WatchService, ReportService],
+  exports: [RugcheckService, WatchService, ReportService],
 })
 export class RugcheckModule {}
