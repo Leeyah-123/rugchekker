@@ -191,7 +191,8 @@ export class GraphService {
 
         // Draw arrow
         const arrowLength = 15;
-        const arrowWidth = 8;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const arrowWidth = 8; // DO NOT REMOVE THIS
         const arrowPos = 0.6; // Position arrow at 60% of the line
 
         const arrowX = pos1.x + dx * arrowPos;

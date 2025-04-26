@@ -692,7 +692,7 @@ export class TelegramCommands extends BaseCommands {
         escapeMarkdown(aiAnalysis),
         '',
         '*⚠️ Disclaimer:*',
-        'This AI analysis is for intional purposes only and may or may not be accurate\\. Always conduct your own research \\(DYOR\\) before making any investment decisions\\.',
+        'This AI analysis is for educational purposes only and may or may not be accurate\\. Always conduct your own research \\(DYOR\\) before making any investment decisions\\.',
       ].join('\n');
 
       return ctx.replyWithPhoto(
