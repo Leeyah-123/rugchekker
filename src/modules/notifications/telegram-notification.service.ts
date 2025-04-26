@@ -28,7 +28,7 @@ export class TelegramNotificationService {
         `*Token:* \`${escapeMarkdown(report.mint)}\``,
         `*Creator:* \`${escapeMarkdown(report.creator)}\``,
         `*Reason:* ${escapeMarkdown(report.message)}`,
-        `*Timestamp:* ${new Date(report.createdAt).toLocaleString()}`,
+        `*Reported On:* ${new Date(report.createdAt).toLocaleString()}`,
       ];
 
       if (report.evidence) {

@@ -31,9 +31,10 @@ export class TelegramCommands extends BaseCommands {
 
   async handleAnalyzeCommand(ctx: Context) {
     const loading = new LoadingMessage(ctx);
+    let replyParams: ReplyParameters | undefined;
+
     try {
       let mintAddress = '';
-      let replyParams: ReplyParameters | undefined;
 
       // Handle both command and callback contexts
       if (
@@ -116,12 +117,7 @@ export class TelegramCommands extends BaseCommands {
       this.handleCommandError(err, () => {
         this.logger.error('Error processing analyze command/callback', err);
         return ctx.reply('An error occurred while processing your request.', {
-          reply_parameters: ctx.message
-            ? {
-                message_id: ctx.message.message_id,
-                chat_id: ctx.message.chat.id,
-              }
-            : undefined,
+          reply_parameters: replyParams,
         });
       });
     }
@@ -162,18 +158,15 @@ export class TelegramCommands extends BaseCommands {
 
         await ctx.answerCbQuery('Preparing report command...');
 
-        await ctx.reply(
-          'Send your report in one of these formats:\n\n' +
-            '1. Text message:\n/report <token> <message>\n\n' +
-            '2. Photo with caption:\n/report <token> <message>\n\n' +
-            'Token to report: ' +
-            mintAddress,
+        return ctx.reply(
+          escapeMarkdown(`Send your report in one of these formats:\n
+1. Text message:\n/report ${mintAddress} <message>\n\n
+2. Photo with caption:\n/report ${mintAddress} <message>\n\n`),
           {
             parse_mode: 'MarkdownV2',
             reply_parameters: replyParams,
           },
         );
-        return;
       }
 
       // Handle report command
@@ -313,6 +306,9 @@ export class TelegramCommands extends BaseCommands {
         parse_mode: 'MarkdownV2',
         reply_markup,
         reply_parameters: replyParams,
+        link_preview_options: {
+          is_disabled: true,
+        },
       });
     } catch (err) {
       this.logger.error('Error fetching new tokens', err);
@@ -345,6 +341,9 @@ export class TelegramCommands extends BaseCommands {
         parse_mode: 'MarkdownV2',
         reply_markup,
         reply_parameters: replyParams,
+        link_preview_options: {
+          is_disabled: true,
+        },
       });
     } catch (err) {
       this.logger.error('Error fetching recent tokens', err);
@@ -376,6 +375,9 @@ export class TelegramCommands extends BaseCommands {
         parse_mode: 'MarkdownV2',
         reply_markup,
         reply_parameters: replyParams,
+        link_preview_options: {
+          is_disabled: true,
+        },
       });
     } catch (err) {
       this.logger.error('Error fetching trending tokens', err);
@@ -407,6 +409,9 @@ export class TelegramCommands extends BaseCommands {
         parse_mode: 'MarkdownV2',
         reply_markup,
         reply_parameters: replyParams,
+        link_preview_options: {
+          is_disabled: true,
+        },
       });
     } catch (err) {
       this.logger.error('Error fetching verified tokens', err);
@@ -656,6 +661,12 @@ export class TelegramCommands extends BaseCommands {
         mintAddress,
         duration as any,
       );
+      if (candlestickData.data.length === 0) {
+        await loading.stop();
+        return ctx.reply('No candlestick data found for this token.', {
+          reply_parameters: replyParams,
+        });
+      }
 
       const [aiAnalysis, graphBuffer] = await Promise.all([
         this.aiService.analyzeCandlestickPattern(
@@ -681,7 +692,7 @@ export class TelegramCommands extends BaseCommands {
         escapeMarkdown(aiAnalysis),
         '',
         '*⚠️ Disclaimer:*',
-        'This AI analysis is for informational purposes only and may or may not be accurate\\. Always conduct your own research \\(DYOR\\) before making any investment decisions\\.',
+        'This AI analysis is for intional purposes only and may or may not be accurate\\. Always conduct your own research \\(DYOR\\) before making any investment decisions\\.',
       ].join('\n');
 
       return ctx.replyWithPhoto(

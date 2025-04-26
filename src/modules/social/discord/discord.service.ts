@@ -52,26 +52,33 @@ export class DiscordService extends BasePlatformService {
       if (message.author.bot) return;
 
       const commandMap = {
-        '!analyze': this.commands.handleAnalyzeCommand.bind(this),
-        '!report': this.commands.handleReportCommand.bind(this),
-        '!creator': this.commands.handleCreatorCommand.bind(this),
-        '!help': this.commands.handleHelpCommand.bind(this),
-        '!new_tokens': this.commands.handleNewTokensCommand.bind(this),
-        '!recent': this.commands.handleRecentCommand.bind(this),
-        '!trending': this.commands.handleTrendingCommand.bind(this),
-        '!verified': this.commands.handleVerifiedCommand.bind(this),
-        '!insiders': this.commands.handleInsidersCommand.bind(this),
-        '!analyze_network':
-          this.commands.handleAnalyzeNetworkCommand.bind(this),
-        '!wc': this.commands.handleWatchCreatorCommand.bind(this),
-        '!uc': this.commands.handleUnwatchCreatorCommand.bind(this),
-        '!wt': this.commands.handleWatchTokenCommand.bind(this),
-        '!ut': this.commands.handleUnwatchTokenCommand.bind(this),
+        '!analyze': this.commands.handleAnalyzeCommand.bind(this.commands),
+        '!report': this.commands.handleReportCommand.bind(this.commands),
+        '!creator': this.commands.handleCreatorCommand.bind(this.commands),
+        '!help': this.commands.handleHelpCommand.bind(this.commands),
+        '!new_tokens': this.commands.handleNewTokensCommand.bind(this.commands),
+        '!recent': this.commands.handleRecentCommand.bind(this.commands),
+        '!trending': this.commands.handleTrendingCommand.bind(this.commands),
+        '!verified': this.commands.handleVerifiedCommand.bind(this.commands),
+        '!insiders': this.commands.handleInsidersCommand.bind(this.commands),
+        '!analyze_network': this.commands.handleAnalyzeNetworkCommand.bind(
+          this.commands,
+        ),
+        '!wc': this.commands.handleWatchCreatorCommand.bind(this.commands),
+        '!uc': this.commands.handleUnwatchCreatorCommand.bind(this.commands),
+        '!wt': this.commands.handleWatchTokenCommand.bind(this.commands),
+        '!ut': this.commands.handleUnwatchTokenCommand.bind(this.commands),
       };
 
       const command = message.content.split(' ')[0].toLowerCase();
       if (commandMap[command]) {
         await commandMap[command](message);
+        return;
+      }
+      if (command.startsWith('!')) {
+        await message.reply({
+          content: 'Unknown command. Use !help for a list of commands.',
+        });
       }
     });
 
