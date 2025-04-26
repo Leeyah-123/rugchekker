@@ -603,8 +603,8 @@ export class TelegramCommands extends BaseCommands {
     try {
       const parts = ('text' in ctx.message ? ctx.message.text : '').split(' ');
 
-      const mintAddress = parts[2];
-      const duration = parts[3] || '1d';
+      const mintAddress = parts[1];
+      const duration = parts[2] || '1d';
 
       if (!mintAddress) {
         const supportedDurations = Object.entries(SUPPORTED_OHLCV_DURATIONS)
