@@ -101,7 +101,12 @@ describe('RugcheckService', () => {
         }),
       );
 
-      const result = await service.reportToken(mintAddress);
+      const result = await service.reportToken(mintAddress, {
+        message: 'test',
+        creator: 'creator-address',
+        reportedBy: 'reporter-address',
+        platform: 'platform',
+      });
       expect(result).toEqual(mockResponse);
       expect(httpService.post).toHaveBeenCalledWith(
         `http://api.test/tokens/${mintAddress}/report`,
@@ -121,7 +126,12 @@ describe('RugcheckService', () => {
         .spyOn(httpService, 'post')
         .mockReturnValueOnce(throwError(() => error));
 
-      const result = await service.reportToken(mintAddress);
+      const result = await service.reportToken(mintAddress, {
+        message: 'test',
+        creator: 'creator-address',
+        reportedBy: 'reporter-address',
+        platform: 'platform',
+      });
       expect(result.success).toBe(true);
       expect(result.message).toContain('already been reported');
     });

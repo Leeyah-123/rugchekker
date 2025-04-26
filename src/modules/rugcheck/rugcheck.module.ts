@@ -1,22 +1,27 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { HttpModule } from '@nestjs/axios';
+import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { RugcheckService } from './rugcheck.service';
 import {
   TokenReport,
   TokenReportSchema,
 } from '../../schemas/token-report.schema';
+import {
+  WatchSubscription,
+  WatchSubscriptionSchema,
+} from '../../schemas/watch-subscription.schema';
+import { ReportService } from '../report/report.service';
+import { WatchService } from '../watch/watch.service';
+import { RugcheckService } from './rugcheck.service';
 
 @Module({
   imports: [
-    ConfigModule,
     HttpModule,
     MongooseModule.forFeature([
       { name: TokenReport.name, schema: TokenReportSchema },
+      { name: WatchSubscription.name, schema: WatchSubscriptionSchema },
     ]),
   ],
-  providers: [RugcheckService],
-  exports: [RugcheckService],
+  providers: [RugcheckService, WatchService, ReportService],
+  exports: [RugcheckService, WatchService, ReportService],
 })
 export class RugcheckModule {}

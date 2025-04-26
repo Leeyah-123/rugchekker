@@ -1,3 +1,4 @@
+import { escapeMarkdown } from 'src/shared/utils';
 import {
   RecentToken,
   TokenStat,
@@ -5,10 +6,6 @@ import {
   VerifiedToken,
 } from 'src/common/interfaces/rugcheck';
 import { InlineKeyboardMarkup } from 'telegraf/typings/core/types/typegram';
-
-function escapeMarkdown(text: string): string {
-  return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
-}
 
 type TokenListType =
   | TokenStat[]

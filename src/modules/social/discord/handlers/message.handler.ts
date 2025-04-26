@@ -46,7 +46,7 @@ export function formatRiskReport(
       },
       {
         name: '📊 Risk Score',
-        value: `${report.score_normalised.toFixed(2)}/100`,
+        value: `${report.score_normalised.toFixed(2)}/10 ${report.score_normalised <= 4 ? '🔴' : report.score_normalised <= 7 ? '🟡' : '🟢'}`,
         inline: true,
       },
       verificationStatus,
@@ -104,7 +104,7 @@ export function formatRiskReport(
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId(`check_creator:${report.creator}`)
+      .setCustomId(`check_creator:${report.creator || 'unknown'}`)
       .setLabel('Check Creator')
       .setStyle(ButtonStyle.Secondary)
       .setEmoji('👤'),

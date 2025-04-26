@@ -3,23 +3,28 @@ import { Context } from 'telegraf';
 
 export class LoadingMessage {
   private message: any;
-  private frameIndex = 0;
+  private dots = 0;
   private interval: NodeJS.Timeout;
   private baseText: string;
   private readonly logger = new Logger('LoadingMessage');
-  private readonly frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
   constructor(private readonly ctx: Context) {}
 
   async start(text: string): Promise<void> {
     this.baseText = text;
-    this.message = await this.ctx.reply(`${this.frames[0]} ${this.baseText}`);
+    this.message = await this.ctx.reply(this.baseText, {
+      reply_parameters: {
+        message_id: this.ctx.message.message_id,
+        chat_id: this.ctx.message.chat.id,
+      },
+    });
 
     this.interval = setInterval(async () => {
-      this.frameIndex = (this.frameIndex + 1) % this.frames.length;
-      const newText = `${this.frames[this.frameIndex]} ${this.baseText}`;
+      this.dots = (this.dots + 1) % 4;
+      const newText = this.baseText + '.'.repeat(this.dots);
 
       try {
+        // Only update if text has changed
         if (this.message?.text !== newText) {
           await this.ctx.telegram.editMessageText(
             this.message.chat.id,
@@ -29,14 +34,17 @@ export class LoadingMessage {
           );
         }
       } catch (error) {
+        // Ignore edit conflicts
         if (
           !error.message?.includes('message is not modified') &&
-          !error.message?.includes('message to edit not found')
+          !error.message?.includes('message to edit not found') &&
+          !error.message?.includes('MESSAGE_ID_INVALID') &&
+          !error.message?.includes('message to be replied not found')
         ) {
           this.logger.error('Error updating loading message:', error);
         }
       }
-    }, 100);
+    }, 500);
   }
 
   async stop(): Promise<void> {
@@ -46,14 +54,14 @@ export class LoadingMessage {
 
     try {
       if (this.message) {
-        await this.ctx.telegram.deleteMessage(
-          this.message.chat.id,
-          this.message.message_id,
-        );
-        this.message = null;
+        await this.ctx.telegram
+          .deleteMessage(this.message.chat.id, this.message.message_id)
+          .catch(() => {
+            // Ignore deletion errors
+          });
       }
-    } catch (error) {
-      this.logger.error('Error cleaning up loading message:', error);
+    } finally {
+      this.message = null;
     }
   }
 }

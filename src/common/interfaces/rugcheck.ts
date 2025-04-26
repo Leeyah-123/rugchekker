@@ -247,3 +247,18 @@ export interface CreatorReport {
   totalReports: number;
   uniqueTokensReported: number;
 }
+
+export interface InsidersGraphData {
+  net_id: string;
+  network_type: string;
+  nodes: Array<{
+    id: string;
+    holdings: number;
+    participant: boolean;
+  }>;
+  links: Array<{
+    source: string;
+    target: string;
+  }>;
+  related_mint: string | null;
+}
