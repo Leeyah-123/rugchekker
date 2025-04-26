@@ -28,8 +28,7 @@ export class DiscordCommands extends BaseCommands {
     const query = msg.content.replace(/^!analyze\s*/, '');
 
     if (!query) {
-      return this.reply(
-        msg.reply.bind(msg),
+      return msg.reply(
         'Invalid command. Usage: !analyze <token>\nExample: !analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
       );
     }
@@ -213,8 +212,7 @@ export class DiscordCommands extends BaseCommands {
       const participantsOnly = parts[1]?.toLowerCase() === 'participants';
 
       if (!mintAddress) {
-        return this.reply(
-          msg.reply.bind(msg),
+        return msg.reply(
           'Invalid command. Usage:\n' +
             '!insiders <token> [participants]\n\n' +
             'Examples:\n' +
@@ -223,21 +221,18 @@ export class DiscordCommands extends BaseCommands {
         );
       }
       if (!isValidSolanaAddress(mintAddress))
-        return this.reply(msg.reply.bind(msg), 'Invalid address provided.');
+        return msg.reply('Invalid address provided.');
 
       const loadingMsg = await msg.reply('Generating insiders graph...');
 
       const graphData =
         await this.rugcheckService.getInsidersGraph(mintAddress);
       if (typeof graphData === 'string') {
-        return this.reply(msg.reply.bind(msg), graphData);
+        return msg.reply(graphData);
       }
 
       if (!graphData || graphData.length === 0) {
-        return this.reply(
-          msg.reply.bind(msg),
-          'No insider data found for this token.',
-        );
+        return msg.reply('No insider data found for this token.');
       }
       const imageBuffer = await this.graphService.generateInsidersGraph(
         graphData as any,
@@ -280,8 +275,7 @@ export class DiscordCommands extends BaseCommands {
       });
     } catch (err) {
       this.logger.error('Error generating insiders graph', err);
-      return this.reply(
-        msg.reply.bind(msg),
+      return msg.reply(
         'An error occurred while generating the insiders graph.',
       );
     }
@@ -321,8 +315,7 @@ export class DiscordCommands extends BaseCommands {
           .map(([key, value]) => `${key} (${value})`)
           .join('\n');
 
-        return this.reply(
-          msg.reply.bind(msg),
+        return msg.reply(
           'Invalid command. Usage:\n' +
             '!analyze_network <token> [duration]\n\n' +
             'Examples:\n' +
@@ -334,13 +327,12 @@ export class DiscordCommands extends BaseCommands {
       }
 
       if (!isValidSolanaAddress(mintAddress)) {
-        return this.reply(msg.reply.bind(msg), 'Invalid token address format.');
+        return msg.reply('Invalid token address format.');
       }
 
       // Validate duration
       if (!(duration in SUPPORTED_OHLCV_DURATIONS)) {
-        return this.reply(
-          msg.reply.bind(msg),
+        return msg.reply(
           'Invalid duration specified.\n' +
             'Supported durations:\n' +
             Object.entries(SUPPORTED_OHLCV_DURATIONS)
@@ -361,6 +353,9 @@ export class DiscordCommands extends BaseCommands {
         mintAddress,
         duration as any,
       );
+      if (candlestickData.data.length === 0) {
+        return msg.reply('No candlestick data found for this token.');
+      }
 
       const [aiAnalysis, graphBuffer] = await Promise.all([
         this.aiService.analyzeCandlestickPattern(
@@ -394,10 +389,7 @@ export class DiscordCommands extends BaseCommands {
       });
     } catch (err) {
       this.logger.error('Error analyzing network', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while analyzing the network.',
-      );
+      return msg.reply('An error occurred while analyzing the network.');
     }
   }
 
@@ -503,10 +495,6 @@ export class DiscordCommands extends BaseCommands {
       this.logger.error('Error unwatching token', err);
       return loading.edit('An error occurred while removing the watch.');
     }
-  }
-
-  private reply(replyFunction: (payload: any) => any, payload: any) {
-    return replyFunction(payload);
   }
 
   private formatCreatorReport(address: string, report: CreatorReport) {

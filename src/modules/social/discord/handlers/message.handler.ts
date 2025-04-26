@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { RugCheckTokenReport } from 'src/common/interfaces/rugcheck';
 import { TokenReport } from 'src/schemas/token-report.schema';
+import { truncateAddress } from 'src/shared/utils';
 
 export function formatRiskReport(
   tokenLabel: string,
@@ -140,7 +141,7 @@ export function formatCreatorReport(
             .slice(0, 5)
             .map(
               (r) =>
-                `**Token: ${r.mint}**\n${r.message}\nReported: ${new Date(
+                `**Token: [${truncateAddress(r.mint, 4, 4)}](https://solscan.io/token/${r.mint})**\n${r.message}\nReported: ${new Date(
                   r.createdAt,
                 ).toLocaleDateString()}`,
             )

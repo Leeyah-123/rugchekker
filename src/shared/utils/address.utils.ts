@@ -2,8 +2,8 @@ import bs58 from 'bs58';
 
 export const truncateAddress = (
   address: string,
-  start: number = 6,
-  end: number = 6,
+  start: number = 4,
+  end: number = 4,
 ): string => {
   if (address.length <= start + end) {
     return address;

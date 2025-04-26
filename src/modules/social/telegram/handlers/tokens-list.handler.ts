@@ -1,10 +1,10 @@
-import { escapeMarkdown } from 'src/shared/utils';
 import {
   RecentToken,
   TokenStat,
   TrendingToken,
   VerifiedToken,
 } from 'src/common/interfaces/rugcheck';
+import { escapeMarkdown, truncateAddress } from 'src/shared/utils';
 import { InlineKeyboardMarkup } from 'telegraf/typings/core/types/typegram';
 
 type TokenListType =
@@ -19,25 +19,25 @@ function formatTokenItem(
   if ('createAt' in token) {
     return (
       `🔹 *${escapeMarkdown(token.symbol)}*\n` +
-      `├ Mint: \`${escapeMarkdown(token.mint)}\`\n` +
+      `├ Mint: [${escapeMarkdown(truncateAddress(token.mint))}](https://solscan\.io/token/${token.mint})\n` +
       `└ Created: ${escapeMarkdown(new Date(token.createAt).toLocaleString())}`
     );
   } else if ('metadata' in token) {
     return (
       `🔹 *${escapeMarkdown(token.metadata.symbol)}*\n` +
-      `├ Mint: \`${escapeMarkdown(token.mint)}\`\n` +
+      `├ Mint: [${escapeMarkdown(truncateAddress(token.mint))}](https://solscan\.io/token/${token.mint})\n` +
       `└ Visits: ${token.visits}`
     );
   } else if ('up_count' in token) {
     return (
-      `🔹 *${escapeMarkdown(token.mint)}*\n` +
+      `🔹 *[${escapeMarkdown(token.mint)}](https://solscan\.io/token/${token.mint})*\n` +
       `├ Votes: ${token.vote_count}\n` +
       `└ Upvotes: ${token.up_count}`
     );
   } else {
     return (
-      `🔹 *${escapeMarkdown(token.symbol)}*\n` +
-      `├ Mint: \`${escapeMarkdown(token.mint)}\`\n` +
+      `🔹 *[${escapeMarkdown(token.mint)}](https://solscan\.io/token/${token.mint})*\n` +
+      `├ Mint: [${escapeMarkdown(truncateAddress(token.mint))}](https://solscan\.io/token/${token.mint})\n` +
       `└ ${token.jup_verified ? '✅ Verified' : '❌ Unverified'}`
     );
   }
