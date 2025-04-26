@@ -135,8 +135,7 @@ export class DiscordCommands extends BaseCommands {
         .setColor(0x4a90e2)
         .setFooter({ text: 'Stay safe with RugChekker' });
 
-      await loading.delete();
-      return msg.reply({ embeds: [embed] });
+      return loading.edit({ embeds: [embed] });
     } catch (err) {
       this.logger.error('Error displaying help menu', err);
       return loading.edit('An error occurred while loading the help menu.');
@@ -151,8 +150,8 @@ export class DiscordCommands extends BaseCommands {
         '🆕 Recently Created Tokens',
         tokens,
       );
-      await loading.delete();
-      return msg.reply({ embeds: [embed], components });
+
+      return loading.edit({ embeds: [embed], components });
     } catch (err) {
       this.logger.error('Error fetching new tokens', err);
       return loading.edit('An error occurred while fetching new tokens.');
@@ -167,8 +166,8 @@ export class DiscordCommands extends BaseCommands {
         '👀 Most Viewed Tokens',
         tokens,
       );
-      await loading.delete();
-      return msg.reply({ embeds: [embed], components });
+
+      return loading.edit({ embeds: [embed], components });
     } catch (err) {
       this.logger.error('Error fetching recent tokens', err);
       return loading.edit('An error occurred while fetching recent tokens.');
@@ -183,8 +182,8 @@ export class DiscordCommands extends BaseCommands {
         '🔥 Trending Tokens',
         tokens,
       );
-      await loading.delete();
-      return msg.reply({ embeds: [embed], components });
+
+      return loading.edit({ embeds: [embed], components });
     } catch (err) {
       this.logger.error('Error fetching trending tokens', err);
       return loading.edit('An error occurred while fetching trending tokens.');
@@ -199,8 +198,8 @@ export class DiscordCommands extends BaseCommands {
         '✅ Recently Verified Tokens',
         tokens,
       );
-      await loading.delete();
-      return msg.reply({ embeds: [embed], components });
+
+      return loading.edit({ embeds: [embed], components });
     } catch (err) {
       this.logger.error('Error fetching verified tokens', err);
       return loading.edit('An error occurred while fetching verified tokens.');
@@ -208,13 +207,15 @@ export class DiscordCommands extends BaseCommands {
   }
 
   async handleInsidersCommand(msg: Message) {
+    const loading = await msg.reply('Generating insiders graph...');
+
     try {
       const parts = msg.content.replace(/^!insiders\s*/, '').split(' ');
       const mintAddress = parts[0];
       const participantsOnly = parts[1]?.toLowerCase() === 'participants';
 
       if (!mintAddress) {
-        return msg.reply(
+        return loading.edit(
           'Invalid command. Usage:\n' +
             '!insiders <token> [participants]\n\n' +
             'Examples:\n' +
@@ -223,18 +224,16 @@ export class DiscordCommands extends BaseCommands {
         );
       }
       if (!isValidSolanaAddress(mintAddress))
-        return msg.reply('Invalid address provided.');
-
-      const loadingMsg = await msg.reply('Generating insiders graph...');
+        return loading.edit('Invalid address provided.');
 
       const graphData =
         await this.rugcheckService.getInsidersGraph(mintAddress);
       if (typeof graphData === 'string') {
-        return msg.reply(graphData);
+        return loading.edit(graphData);
       }
 
       if (!graphData || graphData.length === 0) {
-        return msg.reply('No insider data found for this token.');
+        return loading.edit('No insider data found for this token.');
       }
       const imageBuffer = await this.graphService.generateInsidersGraph(
         graphData as any,
@@ -269,15 +268,13 @@ export class DiscordCommands extends BaseCommands {
         });
       }
 
-      await loadingMsg.delete();
-
-      return msg.reply({
+      return loading.edit({
         embeds: [embed],
         files: [{ attachment: imageBuffer, name: 'insiders.png' }],
       });
     } catch (err) {
       this.logger.error('Error generating insiders graph', err);
-      return msg.reply(
+      return loading.edit(
         'An error occurred while generating the insiders graph.',
       );
     }
@@ -298,8 +295,8 @@ export class DiscordCommands extends BaseCommands {
 
       const report = await this.reportService.getCreatorReport(address);
       const { embed } = formatCreatorReport(address, report);
-      await loading.delete();
-      return msg.reply({ embeds: [embed] });
+
+      return loading.edit({ embeds: [embed] });
     } catch (err) {
       this.logger.error('Error handling creator command', err);
       return loading.edit('An error occurred while fetching creator report.');
@@ -307,6 +304,7 @@ export class DiscordCommands extends BaseCommands {
   }
 
   async handleAnalyzeNetworkCommand(msg: Message) {
+    const loading = await msg.reply('Analyzing token network...');
     try {
       const parts = msg.content.replace(/^!analyze_network\s*/, '').split(' ');
       const mintAddress = parts[0];
@@ -317,7 +315,7 @@ export class DiscordCommands extends BaseCommands {
           .map(([key, value]) => `${key} (${value})`)
           .join('\n');
 
-        return msg.reply(
+        return loading.edit(
           'Invalid command. Usage:\n' +
             '!analyze_network <token> [duration]\n\n' +
             'Examples:\n' +
@@ -329,12 +327,12 @@ export class DiscordCommands extends BaseCommands {
       }
 
       if (!isValidSolanaAddress(mintAddress)) {
-        return msg.reply('Invalid token address format.');
+        return loading.edit('Invalid token address format.');
       }
 
       // Validate duration
       if (!(duration in SUPPORTED_OHLCV_DURATIONS)) {
-        return msg.reply(
+        return loading.edit(
           'Invalid duration specified.\n' +
             'Supported durations:\n' +
             Object.entries(SUPPORTED_OHLCV_DURATIONS)
@@ -343,11 +341,9 @@ export class DiscordCommands extends BaseCommands {
         );
       }
 
-      const loadingMsg = await msg.reply('Analyzing token network...');
-
       const tokenInfo = await this.rugcheckService.getTokenReport(mintAddress);
       if (typeof tokenInfo === 'string') {
-        await loadingMsg.edit(tokenInfo);
+        await loading.edit(tokenInfo);
         return;
       }
 
@@ -356,7 +352,7 @@ export class DiscordCommands extends BaseCommands {
         duration as any,
       );
       if (candlestickData.data.length === 0) {
-        return msg.reply('No candlestick data found for this token.');
+        return loading.edit('No candlestick data found for this token.');
       }
 
       const [aiAnalysis, graphBuffer] = await Promise.all([
@@ -383,15 +379,13 @@ export class DiscordCommands extends BaseCommands {
         .setColor(0x4a90e2)
         .setImage('attachment://candlestick.png');
 
-      await loadingMsg.delete();
-
-      return msg.reply({
+      return loading.edit({
         embeds: [embed],
         files: [{ attachment: graphBuffer, name: 'candlestick.png' }],
       });
     } catch (err) {
       this.logger.error('Error analyzing network', err);
-      return msg.reply('An error occurred while analyzing the network.');
+      return loading.edit('An error occurred while analyzing the network.');
     }
   }
 
@@ -413,8 +407,8 @@ export class DiscordCommands extends BaseCommands {
         'discord',
         address,
       );
-      await loading.delete();
-      return msg.reply(result);
+
+      return loading.edit(result);
     } catch (err) {
       this.logger.error('Error watching address', err);
       return loading.edit('An error occurred while setting up the watch.');
@@ -439,8 +433,8 @@ export class DiscordCommands extends BaseCommands {
         'discord',
         address,
       );
-      await loading.delete();
-      return msg.reply(result);
+
+      return loading.edit(result);
     } catch (err) {
       this.logger.error('Error unwatching address', err);
       return loading.edit('An error occurred while removing the watch.');
@@ -465,8 +459,8 @@ export class DiscordCommands extends BaseCommands {
         'discord',
         token,
       );
-      await loading.delete();
-      return msg.reply(result);
+
+      return loading.edit(result);
     } catch (err) {
       this.logger.error('Error watching token', err);
       return loading.edit('An error occurred while setting up the watch.');
@@ -491,8 +485,8 @@ export class DiscordCommands extends BaseCommands {
         'discord',
         token,
       );
-      await loading.delete();
-      return msg.reply(result);
+
+      return loading.edit(result);
     } catch (err) {
       this.logger.error('Error unwatching token', err);
       return loading.edit('An error occurred while removing the watch.');
