@@ -1,5 +1,7 @@
 import { ConfigService } from '@nestjs/config';
+import { ReportService } from 'src/modules/report/report.service';
 import { VybeService } from 'src/modules/vybe/vybe.service';
+import { WatchService } from 'src/modules/watch/watch.service';
 import { SUPPORTED_OHLCV_DURATIONS } from 'src/shared/constants';
 import { escapeMarkdown, truncateAddress } from 'src/shared/utils';
 import { isValidSolanaAddress } from 'src/shared/utils/address.utils';
@@ -12,8 +14,6 @@ import { BaseCommands } from '../../base/base.commands';
 import { formatTelegramReport } from '../handlers/message.handler';
 import { formatTokensList } from '../handlers/tokens-list.handler';
 import { LoadingMessage } from '../utils/loading.util';
-import { WatchService } from 'src/modules/watch/watch.service';
-import { ReportService } from 'src/modules/report/report.service';
 
 export class TelegramCommands extends BaseCommands {
   constructor(
@@ -48,8 +48,9 @@ export class TelegramCommands extends BaseCommands {
           chat_id: ctx.callbackQuery.message.chat.id,
         };
       } else if (ctx.message && 'text' in ctx.message) {
+        console.log(ctx.message);
         const msg = ctx.message.text;
-        mintAddress = msg.replace(/\/analyze\s*/, '');
+        mintAddress = msg.split(' ')[1];
         replyParams = {
           message_id: ctx.message.message_id,
           chat_id: ctx.message.chat.id,
@@ -59,7 +60,15 @@ export class TelegramCommands extends BaseCommands {
       if (!mintAddress) {
         return ctx.reply(
           'Invalid command. Usage: /analyze <token>\nExample: /analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
+          {
+            reply_parameters: replyParams,
+          },
         );
+      }
+      if (!isValidSolanaAddress(mintAddress)) {
+        return ctx.reply('Invalid address provided.', {
+          reply_parameters: replyParams,
+        });
       }
 
       await loading.start('Analyzing token security');
@@ -133,10 +142,23 @@ export class TelegramCommands extends BaseCommands {
 
   async handleReportCommand(ctx: Context) {
     const loading = new LoadingMessage(ctx);
+    let replyParams: ReplyParameters | undefined;
+
     try {
       // Handle report button click
       if (ctx.callbackQuery && 'data' in ctx.callbackQuery) {
+        replyParams = {
+          message_id: ctx.callbackQuery.message.message_id,
+          chat_id: ctx.callbackQuery.message.chat.id,
+        };
+
         const mintAddress = ctx.callbackQuery.data.split(':')[1];
+        if (!isValidSolanaAddress(mintAddress)) {
+          return ctx.reply('Invalid address provided.', {
+            reply_parameters: replyParams,
+          });
+        }
+
         await ctx.answerCbQuery('Preparing report command...');
 
         await ctx.reply(
@@ -147,10 +169,7 @@ export class TelegramCommands extends BaseCommands {
             mintAddress,
           {
             parse_mode: 'MarkdownV2',
-            reply_parameters: {
-              message_id: ctx.callbackQuery.message.message_id,
-              chat_id: ctx.callbackQuery.message.chat.id,
-            },
+            reply_parameters: replyParams,
           },
         );
         return;
@@ -163,6 +182,10 @@ export class TelegramCommands extends BaseCommands {
       let mintAddress = '';
       let reportMessage = '';
       let evidence: string | undefined;
+      replyParams = {
+        message_id: msg.message_id,
+        chat_id: msg.chat.id,
+      };
 
       await loading.start('Processing your report');
 
@@ -171,34 +194,29 @@ export class TelegramCommands extends BaseCommands {
       if (!messageText.startsWith('/report')) {
         await loading.stop();
         return ctx.reply('Report must start with /report command', {
-          reply_parameters: {
-            message_id: msg.message_id,
-            chat_id: msg.chat.id,
-          },
+          reply_parameters: replyParams,
         });
       }
 
-      const parts = messageText.replace(/^\/report\s*/, '').split(' ');
-      mintAddress = parts[0];
-      reportMessage = parts.slice(1).join(' ');
+      const parts = messageText.split(' ');
+      mintAddress = parts[1];
+      reportMessage = parts.slice(2).join(' ');
 
       if (!mintAddress || !reportMessage) {
         await loading.stop();
         return ctx.reply(
           'Invalid command. Usage: /report <token> <reason>\nExample: /report JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN Suspicious token movement',
           {
-            reply_parameters: {
-              message_id: msg.message_id,
-              chat_id: msg.chat.id,
-            },
+            reply_parameters: replyParams,
           },
         );
       }
-
-      const replyParams = {
-        message_id: msg.message_id,
-        chat_id: msg.chat.id,
-      };
+      if (!isValidSolanaAddress(mintAddress)) {
+        await loading.stop();
+        return ctx.reply('Invalid token address provided', {
+          reply_parameters: replyParams,
+        });
+      }
 
       // Get token info to get creator
       const tokenInfo = await this.rugcheckService.getTokenReport(mintAddress);
@@ -232,31 +250,36 @@ export class TelegramCommands extends BaseCommands {
   }
 
   async handleHelpCommand(ctx: Context) {
-    const helpMessage =
-      '*🛡️ RugChekker \\- Solana Token Security Bot*\n\n' +
-      'Welcome to RugChekker\\. Analyze and detect potential risks in Solana tokens before investing\\. ' +
-      'Get detailed security reports, market metrics, and risk assessments for any token\\.\n\n' +
-      '*📊 Available Commands:*\n' +
-      '├ /analyze \\<token\\> \\- Get a detailed risk report\n' +
-      '├ /report \\<token\\> \\<reason\\> [Attachment \\(optional\\)] \\- Report a suspicious token\n' +
-      '├ /creator \\<address\\> \\- Get creator report\n' +
-      '├ /insiders \\<token\\> [participants] \\- View insider trading network\n' +
-      '├ /analyze_network \\<token\\> \\[duration\\] \\- Analyze token network over time\n' +
+    const helpMessage = [
+      '*🛡️ RugChekker \\- Solana Token Security Bot*',
+      '',
+      'Welcome to RugChekker\\. Analyze and detect potential risks in Solana tokens before investing\\.',
+      'Get detailed security reports, market metrics, and risk assessments for any token\\.',
+      '',
+      '*📊 Available Commands:*',
+      '`/analyze <token>` \\- Get a detailed risk report',
+      '`/report <token> <reason> [Attachment (optional)]` \\- Report a suspicious token',
+      '`/creator <address>` \\- Get creator report',
+      '`/insiders <token> [participants]` \\- View insider trading network',
+      '`/analyze\\_network <token> [duration]` \\- Analyze token network over time',
       `Supported durations: ${Object.entries(SUPPORTED_OHLCV_DURATIONS)
         .map(([key, value]) => `${key} \\(${value}\\)`)
-        .join(', ')}\n` +
-      '├ /new\\_tokens \\- View recently created tokens\n' +
-      '├ /recent \\- View most viewed tokens\n' +
-      '├ /trending \\- View trending tokens\n' +
-      '├ /verified \\- View verified tokens\n' +
-      '├ /wc \\<address\\> \\- Watch a token creator for reports\n' +
-      '├ /uc \\<address\\> \\- Unwatch a token creator\n' +
-      '├ /wt \\<token\\> \\- Watch a token for reports\n' +
-      '├ /ut \\<token\\> \\- Unwatch a token\n' +
-      '└ /help \\- Display this help message\n\n' +
-      '*🔍 Example Usage:*\n' +
-      '/analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN\n\n' +
-      '_Stay safe with RugChekker_';
+        .join(', ')}`,
+      '`/new\\_tokens` \\- View recently created tokens',
+      '`/recent` \\- View most viewed tokens',
+      '`/trending` \\- View trending tokens',
+      '`/verified` \\- View verified tokens',
+      '`/wc <address>` \\- Watch creator for reports',
+      '`/uc <address>` \\- Unwatch creator',
+      '`/wt <token>` \\- Watch token for reports',
+      '`/ut <token>` \\- Unwatch token',
+      '`/help` \\- Display this help message',
+      '',
+      '*🔍 Example Usage:*',
+      '`/analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN`',
+      '',
+      '_Stay safe with RugChekker_',
+    ].join('\n');
 
     return ctx.reply(helpMessage, {
       parse_mode: 'MarkdownV2',
@@ -268,17 +291,21 @@ export class TelegramCommands extends BaseCommands {
   }
 
   async handleNewTokensCommand(ctx: Context) {
+    const loading = new LoadingMessage(ctx);
     const replyParams = {
       message_id: ctx.message.message_id,
       chat_id: ctx.message.chat.id,
     };
 
     try {
+      await loading.start('Fetching newly created tokens');
       const tokens = await this.rugcheckService.getNewTokens();
       const { text, reply_markup } = formatTokensList(
         '🆕 Recently Created Tokens',
         tokens,
       );
+
+      await loading.stop();
       return ctx.reply(text, {
         parse_mode: 'MarkdownV2',
         reply_markup,
@@ -286,6 +313,7 @@ export class TelegramCommands extends BaseCommands {
       });
     } catch (err) {
       this.logger.error('Error fetching new tokens', err);
+      await loading.stop();
       return ctx.reply('An error occurred while fetching new tokens.', {
         reply_parameters: replyParams,
       });
@@ -293,17 +321,21 @@ export class TelegramCommands extends BaseCommands {
   }
 
   async handleRecentCommand(ctx: Context) {
+    const loading = new LoadingMessage(ctx);
     const replyParams = {
       message_id: ctx.message.message_id,
       chat_id: ctx.message.chat.id,
     };
 
     try {
+      await loading.start('Fetching recently viewed tokens');
       const tokens = await this.rugcheckService.getRecentTokens();
       const { text, reply_markup } = formatTokensList(
         '👀 Most Viewed Tokens',
         tokens,
       );
+
+      await loading.stop();
       return ctx.reply(text, {
         parse_mode: 'MarkdownV2',
         reply_markup,
@@ -311,6 +343,7 @@ export class TelegramCommands extends BaseCommands {
       });
     } catch (err) {
       this.logger.error('Error fetching recent tokens', err);
+      await loading.stop();
       return ctx.reply('An error occurred while fetching recent tokens.', {
         reply_parameters: replyParams,
       });
@@ -318,17 +351,20 @@ export class TelegramCommands extends BaseCommands {
   }
 
   async handleTrendingCommand(ctx: Context) {
+    const loading = new LoadingMessage(ctx);
     const replyParams = {
       message_id: ctx.message.message_id,
       chat_id: ctx.message.chat.id,
     };
 
     try {
+      await loading.start('Fetching trending tokens');
       const tokens = await this.rugcheckService.getTrendingTokens();
       const { text, reply_markup } = formatTokensList(
         '🔥 Trending Tokens',
         tokens,
       );
+      await loading.stop();
       return ctx.reply(text, {
         parse_mode: 'MarkdownV2',
         reply_markup,
@@ -336,6 +372,7 @@ export class TelegramCommands extends BaseCommands {
       });
     } catch (err) {
       this.logger.error('Error fetching trending tokens', err);
+      await loading.stop();
       return ctx.reply('An error occurred while fetching trending tokens.', {
         reply_parameters: replyParams,
       });
@@ -343,17 +380,20 @@ export class TelegramCommands extends BaseCommands {
   }
 
   async handleVerifiedCommand(ctx: Context) {
+    const loading = new LoadingMessage(ctx);
     const replyParams = {
       message_id: ctx.message.message_id,
       chat_id: ctx.message.chat.id,
     };
 
     try {
+      await loading.start('Fetching recently verified tokens');
       const tokens = await this.rugcheckService.getVerifiedTokens();
       const { text, reply_markup } = formatTokensList(
         '✅ Recently Verified Tokens',
         tokens,
       );
+      await loading.stop();
       return ctx.reply(text, {
         parse_mode: 'MarkdownV2',
         reply_markup,
@@ -361,6 +401,7 @@ export class TelegramCommands extends BaseCommands {
       });
     } catch (err) {
       this.logger.error('Error fetching verified tokens', err);
+      await loading.stop();
       return ctx.reply('An error occurred while fetching verified tokens.', {
         reply_parameters: replyParams,
       });
@@ -389,7 +430,7 @@ export class TelegramCommands extends BaseCommands {
         await ctx.answerCbQuery('Analyzing creator...');
       } else if (ctx.message && 'text' in ctx.message) {
         const msg = ctx.message.text;
-        address = msg.replace(/\/creator\s*/, '');
+        address = msg.split(' ')[1];
         replyParams = {
           message_id: ctx.message.message_id,
           chat_id: ctx.message.chat.id,
@@ -403,6 +444,11 @@ export class TelegramCommands extends BaseCommands {
             reply_parameters: replyParams,
           },
         );
+      }
+      if (!isValidSolanaAddress(address)) {
+        return ctx.reply('Invalid address provided.', {
+          reply_parameters: replyParams,
+        });
       }
 
       const report = await this.reportService.getCreatorReport(address);
@@ -448,12 +494,10 @@ export class TelegramCommands extends BaseCommands {
     };
 
     try {
-      const parts = ('text' in ctx.message ? ctx.message.text : '')
-        .replace(/^\/insiders\s*/, '')
-        .split(' ');
+      const parts = ('text' in ctx.message ? ctx.message.text : '').split(' ');
 
-      const mintAddress = parts[0];
-      const participantsOnly = parts[1]?.toLowerCase() === 'participants';
+      const mintAddress = parts[1];
+      const participantsOnly = parts[2]?.toLowerCase() === 'participants';
 
       if (!mintAddress) {
         return ctx.reply(
@@ -466,6 +510,11 @@ export class TelegramCommands extends BaseCommands {
             reply_parameters: replyParams,
           },
         );
+      }
+      if (!isValidSolanaAddress(mintAddress)) {
+        return ctx.reply('Invalid token address format.', {
+          reply_parameters: replyParams,
+        });
       }
 
       await loading.start('Generating insiders graph');
@@ -537,12 +586,10 @@ export class TelegramCommands extends BaseCommands {
     };
 
     try {
-      const parts = ('text' in ctx.message ? ctx.message.text : '')
-        .replace(/^\/analyze_network\s*/, '')
-        .split(' ');
+      const parts = ('text' in ctx.message ? ctx.message.text : '').split(' ');
 
-      const mintAddress = parts[0];
-      const duration = parts[1] || '1d';
+      const mintAddress = parts[2];
+      const duration = parts[3] || '1d';
 
       if (!mintAddress) {
         const supportedDurations = Object.entries(SUPPORTED_OHLCV_DURATIONS)
@@ -564,7 +611,7 @@ export class TelegramCommands extends BaseCommands {
       }
 
       if (!isValidSolanaAddress(mintAddress)) {
-        return ctx.reply('Invalid token address format.', {
+        return ctx.reply('Invalid token address provided.', {
           reply_parameters: replyParams,
         });
       }
@@ -640,18 +687,16 @@ export class TelegramCommands extends BaseCommands {
   }
 
   async handleWatchCreatorCommand(ctx: Context) {
-    const parts = ('text' in ctx.message ? ctx.message.text : '')
-      .replace(/^\/wc\s*/, '')
-      .split(' ');
+    const parts = ('text' in ctx.message ? ctx.message.text : '').split(' ');
 
-    const address = parts[0];
+    const address = parts[1];
     const replyParams = {
       message_id: ctx.message.message_id,
       chat_id: ctx.message.chat.id,
     };
 
     if (!address || !isValidSolanaAddress(address)) {
-      return ctx.reply('Invalid address format. Usage: wc <address>', {
+      return ctx.reply('Invalid address format. Usage: /wc <address>', {
         reply_parameters: replyParams,
       });
     }
@@ -672,11 +717,9 @@ export class TelegramCommands extends BaseCommands {
   }
 
   async handleUnwatchCreatorCommand(ctx: Context) {
-    const parts = ('text' in ctx.message ? ctx.message.text : '')
-      .replace(/^\/uc\s*/, '')
-      .split(' ');
+    const parts = ('text' in ctx.message ? ctx.message.text : '').split(' ');
 
-    const address = parts[0];
+    const address = parts[1];
     const replyParams = {
       message_id: ctx.message.message_id,
       chat_id: ctx.message.chat.id,
@@ -704,18 +747,16 @@ export class TelegramCommands extends BaseCommands {
   }
 
   async handleWatchTokenCommand(ctx: Context) {
-    const parts = ('text' in ctx.message ? ctx.message.text : '')
-      .replace(/^\/wt\s*/, '')
-      .split(' ');
+    const parts = ('text' in ctx.message ? ctx.message.text : '').split(' ');
 
-    const token = parts[0];
+    const token = parts[1];
     const replyParams = {
       message_id: ctx.message.message_id,
       chat_id: ctx.message.chat.id,
     };
 
     if (!token || !isValidSolanaAddress(token)) {
-      return ctx.reply('Invalid token format. Usage: /wt <token>', {
+      return ctx.reply('Invalid command. Usage: /wt <token>', {
         reply_parameters: replyParams,
       });
     }
@@ -736,18 +777,16 @@ export class TelegramCommands extends BaseCommands {
   }
 
   async handleUnwatchTokenCommand(ctx: Context) {
-    const parts = ('text' in ctx.message ? ctx.message.text : '')
-      .replace(/^\/ut\s*/, '')
-      .split(' ');
+    const parts = ('text' in ctx.message ? ctx.message.text : '').split(' ');
 
-    const token = parts[0];
+    const token = parts[1];
     const replyParams = {
       message_id: ctx.message.message_id,
       chat_id: ctx.message.chat.id,
     };
 
     if (!token || !isValidSolanaAddress(token)) {
-      return ctx.reply('Invalid token format. Usage: /ut <token>', {
+      return ctx.reply('Invalid command. Usage: /ut <token>', {
         reply_parameters: replyParams,
       });
     }
