@@ -33,14 +33,20 @@ export class DiscordCommands extends BaseCommands {
         'Invalid command. Usage: !analyze <token>\nExample: !analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
       );
     }
+    const loading = await msg.reply('Analyzing token security...');
 
     try {
       const mintAddress = query;
       const name = '';
 
+      // Validate mint address
+      if (!mintAddress) return loading.edit('Please provide token address.');
+      if (!isValidSolanaAddress(mintAddress))
+        return loading.edit('Invalid address provided.');
+
       const report = await this.rugcheckService.getTokenReport(mintAddress);
       if (typeof report === 'string') {
-        return this.reply(msg.reply.bind(msg), report);
+        return loading.edit(report);
       }
 
       const aiInsights = await this.aiService.analyzeTokenRisks(report);
@@ -49,13 +55,10 @@ export class DiscordCommands extends BaseCommands {
         report,
         aiInsights,
       );
-      return this.reply(msg.reply.bind(msg), { embeds: [embed], components });
+      return loading.edit({ embeds: [embed], components });
     } catch (err) {
       this.logger.error('Error handling analyze command', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while processing your request.',
-      );
+      return loading.edit('An error occurred while processing your request.');
     }
   }
 
@@ -71,6 +74,8 @@ export class DiscordCommands extends BaseCommands {
           'Invalid command. Usage: !report <token> <reason>\nExample: !report JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN Suspicious activity',
         );
       }
+      if (!isValidSolanaAddress(mintAddress))
+        return loading.edit('Invalid address provided.');
 
       const tokenInfo = await this.rugcheckService.getTokenReport(mintAddress);
       if (typeof tokenInfo === 'string') {
@@ -93,108 +98,111 @@ export class DiscordCommands extends BaseCommands {
   }
 
   async handleHelpCommand(msg: Message) {
-    const embed = new EmbedBuilder()
-      .setTitle('🛡️ RugChekker - Solana Token Security Bot')
-      .setDescription(
-        'Welcome to RugChekker. Analyze and detect potential risks in Solana tokens before investing.' +
-          'Get detailed security reports, market metrics, and risk assessments for any token.',
-      )
-      .addFields({
-        name: '📊 Available Commands',
-        value:
-          '`!analyze <token>` - Get a detailed risk report\n' +
-          '`!report <token> <reason> [Attachment (optional)]` - Report a suspicious token\n' +
-          '`!creator <address>` - Get creator report\n' +
-          '`!insiders <token> [participants]` - View insider trading network\n' +
-          '`!analyze_network <token> [duration]` - Analyze token network activity\n' +
-          `Supported durations: ${Object.entries(SUPPORTED_OHLCV_DURATIONS)
-            .map(([key, value]) => `${key} (${value})`)
-            .join(', ')}\n` +
-          '`!new_tokens` - View recently created tokens\n' +
-          '`!recent` - View most viewed tokens\n' +
-          '`!trending` - View trending tokens\n' +
-          '`!verified` - View verified tokens\n' +
-          '`!help` - Display this help message\n' +
-          '`!wc <address>` - Watch a token creator for reports\n' +
-          '`!uc <address>` - Unwatch a token creator address\n' +
-          '`!wt <token>` - Watch a token for reports\n' +
-          '`!ut <token>` - Unwatch a token',
-      })
-      .addFields({
-        name: '🔍 Example Usage',
-        value: '`!analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN`',
-      })
-      .setColor(0x4a90e2)
-      .setFooter({ text: 'Stay safe with RugChekker' });
+    const loading = await msg.reply('Loading help menu...');
+    try {
+      const embed = new EmbedBuilder()
+        .setTitle('🛡️ RugChekker - Solana Token Security Bot')
+        .setDescription(
+          'Welcome to RugChekker. Analyze and detect potential risks in Solana tokens before investing.' +
+            'Get detailed security reports, market metrics, and risk assessments for any token.',
+        )
+        .addFields({
+          name: '📊 Available Commands',
+          value:
+            '`!analyze <token>` - Get a detailed risk report\n' +
+            '`!report <token> <reason> [Attachment (optional)]` - Report a suspicious token\n' +
+            '`!creator <address>` - Get creator report\n' +
+            '`!insiders <token> [participants]` - View insider trading network\n' +
+            '`!analyze_network <token> [duration]` - Analyze token network activity\n' +
+            `Supported durations: ${Object.entries(SUPPORTED_OHLCV_DURATIONS)
+              .map(([key, value]) => `${key} (${value})`)
+              .join(', ')}\n` +
+            '`!new_tokens` - View recently created tokens\n' +
+            '`!recent` - View most viewed tokens\n' +
+            '`!trending` - View trending tokens\n' +
+            '`!verified` - View verified tokens\n' +
+            '`!help` - Display this help message\n' +
+            '`!wc <address>` - Watch a token creator for reports\n' +
+            '`!uc <address>` - Unwatch a token creator address\n' +
+            '`!wt <token>` - Watch a token for reports\n' +
+            '`!ut <token>` - Unwatch a token',
+        })
+        .addFields({
+          name: '🔍 Example Usage',
+          value: '`!analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN`',
+        })
+        .setColor(0x4a90e2)
+        .setFooter({ text: 'Stay safe with RugChekker' });
 
-    return msg.reply({ embeds: [embed] });
+      await loading.delete();
+      return msg.reply({ embeds: [embed] });
+    } catch (err) {
+      this.logger.error('Error displaying help menu', err);
+      return loading.edit('An error occurred while loading the help menu.');
+    }
   }
 
   async handleNewTokensCommand(msg: Message) {
+    const loading = await msg.reply('Fetching new tokens...');
     try {
       const tokens = await this.rugcheckService.getNewTokens();
       const { embed, components } = formatTokensList(
         '🆕 Recently Created Tokens',
         tokens,
       );
-      return this.reply(msg.reply.bind(msg), { embeds: [embed], components });
+      await loading.delete();
+      return msg.reply({ embeds: [embed], components });
     } catch (err) {
       this.logger.error('Error fetching new tokens', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while fetching new tokens.',
-      );
+      return loading.edit('An error occurred while fetching new tokens.');
     }
   }
 
   async handleRecentCommand(msg: Message) {
+    const loading = await msg.reply('Fetching recent tokens...');
     try {
       const tokens = await this.rugcheckService.getRecentTokens();
       const { embed, components } = formatTokensList(
         '👀 Most Viewed Tokens',
         tokens,
       );
-      return this.reply(msg.reply.bind(msg), { embeds: [embed], components });
+      await loading.delete();
+      return msg.reply({ embeds: [embed], components });
     } catch (err) {
       this.logger.error('Error fetching recent tokens', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while fetching recent tokens.',
-      );
+      return loading.edit('An error occurred while fetching recent tokens.');
     }
   }
 
   async handleTrendingCommand(msg: Message) {
+    const loading = await msg.reply('Fetching trending tokens...');
     try {
       const tokens = await this.rugcheckService.getTrendingTokens();
       const { embed, components } = formatTokensList(
         '🔥 Trending Tokens',
         tokens,
       );
-      return this.reply(msg.reply.bind(msg), { embeds: [embed], components });
+      await loading.delete();
+      return msg.reply({ embeds: [embed], components });
     } catch (err) {
       this.logger.error('Error fetching trending tokens', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while fetching trending tokens.',
-      );
+      return loading.edit('An error occurred while fetching trending tokens.');
     }
   }
 
   async handleVerifiedCommand(msg: Message) {
+    const loading = await msg.reply('Fetching verified tokens...');
     try {
       const tokens = await this.rugcheckService.getVerifiedTokens();
       const { embed, components } = formatTokensList(
         '✅ Recently Verified Tokens',
         tokens,
       );
-      return this.reply(msg.reply.bind(msg), { embeds: [embed], components });
+      await loading.delete();
+      return msg.reply({ embeds: [embed], components });
     } catch (err) {
       this.logger.error('Error fetching verified tokens', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while fetching verified tokens.',
-      );
+      return loading.edit('An error occurred while fetching verified tokens.');
     }
   }
 
@@ -214,6 +222,8 @@ export class DiscordCommands extends BaseCommands {
             '!insiders JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN participants',
         );
       }
+      if (!isValidSolanaAddress(mintAddress))
+        return this.reply(msg.reply.bind(msg), 'Invalid address provided.');
 
       const loadingMsg = await msg.reply('Generating insiders graph...');
 
@@ -278,24 +288,25 @@ export class DiscordCommands extends BaseCommands {
   }
 
   async handleCreatorCommand(msg: Message) {
+    const loading = await msg.reply('Fetching creator report...');
     try {
       const address = msg.content.replace(/^!creator\s*/, '');
       if (!address) {
-        return this.reply(
-          msg.reply.bind(msg),
+        return loading.edit(
           'Invalid command. Usage: !creator <address>\nExample: !creator 7WNRFqMpvqXGi6ytz36fS9tWzNh4ptpkCzASREDBBYoi',
         );
+      }
+      if (!isValidSolanaAddress(address)) {
+        return loading.edit('Invalid address provided.');
       }
 
       const report = await this.reportService.getCreatorReport(address);
       const { embed } = this.formatCreatorReport(address, report);
-      return this.reply(msg.reply.bind(msg), { embeds: [embed] });
+      await loading.delete();
+      return msg.reply({ embeds: [embed] });
     } catch (err) {
       this.logger.error('Error handling creator command', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while fetching creator report.',
-      );
+      return loading.edit('An error occurred while fetching creator report.');
     }
   }
 
@@ -322,8 +333,7 @@ export class DiscordCommands extends BaseCommands {
         );
       }
 
-      // Validate mint address format (should be 32-44 chars base58)
-      if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mintAddress)) {
+      if (!isValidSolanaAddress(mintAddress)) {
         return this.reply(msg.reply.bind(msg), 'Invalid token address format.');
       }
 
@@ -392,15 +402,16 @@ export class DiscordCommands extends BaseCommands {
   }
 
   async handleWatchCreatorCommand(msg: Message) {
+    const loading = await msg.reply('Setting up creator watch...');
     try {
       const parts = msg.content.replace(/^!wc\s*/, '').split(' ');
       const address = parts[0];
 
-      if (!address || !isValidSolanaAddress(address)) {
-        return this.reply(
-          msg.reply.bind(msg),
-          'Invalid address format. Usage: !wc <address>',
-        );
+      if (!address) {
+        return loading.edit('Invalid format. Usage: !wc <address>');
+      }
+      if (!isValidSolanaAddress(address)) {
+        return loading.edit('Invalid address provided.');
       }
 
       const result = await this.watchService.watchAddress(
@@ -408,26 +419,25 @@ export class DiscordCommands extends BaseCommands {
         'discord',
         address,
       );
-      return this.reply(msg.reply.bind(msg), result);
+      await loading.delete();
+      return msg.reply(result);
     } catch (err) {
       this.logger.error('Error watching address', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while setting up the watch.',
-      );
+      return loading.edit('An error occurred while setting up the watch.');
     }
   }
 
   async handleUnwatchCreatorCommand(msg: Message) {
+    const loading = await msg.reply('Removing creator watch...');
     try {
       const parts = msg.content.replace(/^uc\s*/, '').split(' ');
       const address = parts[0];
 
-      if (!address || !isValidSolanaAddress(address)) {
-        return this.reply(
-          msg.reply.bind(msg),
-          'Invalid address format. Usage: !uc <address>',
-        );
+      if (!address) {
+        return loading.edit('Invalid format. Usage: !uc <address>');
+      }
+      if (!isValidSolanaAddress(address)) {
+        return loading.edit('Invalid address provided.');
       }
 
       const result = await this.watchService.unwatchAddress(
@@ -435,26 +445,25 @@ export class DiscordCommands extends BaseCommands {
         'discord',
         address,
       );
-      return this.reply(msg.reply.bind(msg), result);
+      await loading.delete();
+      return msg.reply(result);
     } catch (err) {
       this.logger.error('Error unwatching address', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while removing the watch.',
-      );
+      return loading.edit('An error occurred while removing the watch.');
     }
   }
 
   async handleWatchTokenCommand(msg: Message) {
+    const loading = await msg.reply('Setting up token watch...');
     try {
       const parts = msg.content.replace(/^!wt\s*/, '').split(' ');
       const token = parts[0];
 
-      if (!token || !isValidSolanaAddress(token)) {
-        return this.reply(
-          msg.reply.bind(msg),
-          'Invalid token format. Usage: !wt <token>',
-        );
+      if (!token) {
+        return loading.edit('Invalid format. Usage: !wt <token>');
+      }
+      if (!isValidSolanaAddress(token)) {
+        return loading.edit('Invalid token address provided.');
       }
 
       const result = await this.watchService.watchToken(
@@ -462,26 +471,25 @@ export class DiscordCommands extends BaseCommands {
         'discord',
         token,
       );
-      return this.reply(msg.reply.bind(msg), result);
+      await loading.delete();
+      return msg.reply(result);
     } catch (err) {
       this.logger.error('Error watching token', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while setting up the watch.',
-      );
+      return loading.edit('An error occurred while setting up the watch.');
     }
   }
 
   async handleUnwatchTokenCommand(msg: Message) {
+    const loading = await msg.reply('Removing token watch...');
     try {
       const parts = msg.content.replace(/^!ut\s*/, '').split(' ');
       const token = parts[0];
 
-      if (!token || !isValidSolanaAddress(token)) {
-        return this.reply(
-          msg.reply.bind(msg),
-          'Invalid token format. Usage: !ut <token>',
-        );
+      if (!token) {
+        return loading.edit('Invalid format. Usage: !ut <token>');
+      }
+      if (!isValidSolanaAddress(token)) {
+        return loading.edit('Invalid token address provided.');
       }
 
       const result = await this.watchService.unwatchToken(
@@ -489,13 +497,11 @@ export class DiscordCommands extends BaseCommands {
         'discord',
         token,
       );
-      return this.reply(msg.reply.bind(msg), result);
+      await loading.delete();
+      return msg.reply(result);
     } catch (err) {
       this.logger.error('Error unwatching token', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while removing the watch.',
-      );
+      return loading.edit('An error occurred while removing the watch.');
     }
   }
 

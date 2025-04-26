@@ -12,6 +12,7 @@ import {
 import { AiService } from 'src/modules/ai/ai.service';
 import { ReportService } from 'src/modules/report/report.service';
 import { RugcheckService } from 'src/modules/rugcheck/rugcheck.service';
+import { isValidSolanaAddress } from 'src/shared/utils';
 import {
   formatCreatorReport,
   formatRiskReport,
@@ -62,6 +63,17 @@ export class DiscordInteractions {
 
       const [, mintAddress] = interaction.customId.split(':');
       const reason = interaction.fields.getTextInputValue('report_reason');
+
+      if (!mintAddress || !isValidSolanaAddress(mintAddress)) {
+        return interaction.editReply({
+          content: 'Invalid mint address provided.',
+        });
+      }
+      if (!reason || reason.length < 10) {
+        return interaction.editReply({
+          content: 'Please provide a valid reason for reporting.',
+        });
+      }
 
       // Ask for optional evidence
       await interaction.editReply({
