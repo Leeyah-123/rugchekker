@@ -396,7 +396,8 @@ export class GraphService {
 
       // Time labels
       ctx.textAlign = 'center';
-      for (let i = 0; i < data.length; i += Math.floor(data.length / 5)) {
+      const timeStep = Math.max(1, Math.floor(data.length / 5));
+      for (let i = 0; i < data.length; i += timeStep) {
         const x = padding + (chartWidth * i) / data.length;
         const date = new Date(data[i].timestamp);
         ctx.fillText(
