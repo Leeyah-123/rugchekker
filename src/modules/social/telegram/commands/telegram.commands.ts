@@ -48,7 +48,6 @@ export class TelegramCommands extends BaseCommands {
           chat_id: ctx.callbackQuery.message.chat.id,
         };
       } else if (ctx.message && 'text' in ctx.message) {
-        console.log(ctx.message);
         const msg = ctx.message.text;
         mintAddress = msg.split(' ')[1];
         replyParams = {
