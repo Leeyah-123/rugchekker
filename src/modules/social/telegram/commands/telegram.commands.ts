@@ -113,14 +113,16 @@ export class TelegramCommands extends BaseCommands {
       }
     } catch (err) {
       await loading.stop();
-      this.logger.error('Error processing analyze command/callback', err);
-      return ctx.reply('An error occurred while processing your request.', {
-        reply_parameters: ctx.message
-          ? {
-              message_id: ctx.message.message_id,
-              chat_id: ctx.message.chat.id,
-            }
-          : undefined,
+      this.handleCommandError(err, () => {
+        this.logger.error('Error processing analyze command/callback', err);
+        return ctx.reply('An error occurred while processing your request.', {
+          reply_parameters: ctx.message
+            ? {
+                message_id: ctx.message.message_id,
+                chat_id: ctx.message.chat.id,
+              }
+            : undefined,
+        });
       });
     }
   }
@@ -238,12 +240,14 @@ export class TelegramCommands extends BaseCommands {
       return ctx.reply(result.message, { reply_parameters: replyParams });
     } catch (err) {
       await loading.stop();
-      this.logger.error('Error processing report command/callback', err);
-      return ctx.reply('An error occurred while reporting the token.', {
-        reply_parameters: {
-          message_id: ctx.message.message_id,
-          chat_id: ctx.message.chat.id,
-        },
+      this.handleCommandError(err, () => {
+        this.logger.error('Error processing report command/callback', err);
+        return ctx.reply('An error occurred while reporting the token.', {
+          reply_parameters: {
+            message_id: ctx.message.message_id,
+            chat_id: ctx.message.chat.id,
+          },
+        });
       });
     }
   }
@@ -313,8 +317,10 @@ export class TelegramCommands extends BaseCommands {
     } catch (err) {
       this.logger.error('Error fetching new tokens', err);
       await loading.stop();
-      return ctx.reply('An error occurred while fetching new tokens.', {
-        reply_parameters: replyParams,
+      this.handleCommandError(err, () => {
+        return ctx.reply('An error occurred while fetching new tokens.', {
+          reply_parameters: replyParams,
+        });
       });
     }
   }
@@ -343,8 +349,10 @@ export class TelegramCommands extends BaseCommands {
     } catch (err) {
       this.logger.error('Error fetching recent tokens', err);
       await loading.stop();
-      return ctx.reply('An error occurred while fetching recent tokens.', {
-        reply_parameters: replyParams,
+      this.handleCommandError(err, () => {
+        return ctx.reply('An error occurred while fetching recent tokens.', {
+          reply_parameters: replyParams,
+        });
       });
     }
   }
@@ -372,8 +380,10 @@ export class TelegramCommands extends BaseCommands {
     } catch (err) {
       this.logger.error('Error fetching trending tokens', err);
       await loading.stop();
-      return ctx.reply('An error occurred while fetching trending tokens.', {
-        reply_parameters: replyParams,
+      this.handleCommandError(err, () => {
+        return ctx.reply('An error occurred while fetching trending tokens.', {
+          reply_parameters: replyParams,
+        });
       });
     }
   }
@@ -401,8 +411,10 @@ export class TelegramCommands extends BaseCommands {
     } catch (err) {
       this.logger.error('Error fetching verified tokens', err);
       await loading.stop();
-      return ctx.reply('An error occurred while fetching verified tokens.', {
-        reply_parameters: replyParams,
+      this.handleCommandError(err, () => {
+        return ctx.reply('An error occurred while fetching verified tokens.', {
+          reply_parameters: replyParams,
+        });
       });
     }
   }
@@ -476,11 +488,13 @@ export class TelegramCommands extends BaseCommands {
       });
     } catch (err) {
       this.logger.error('Error processing creator command/callback', err);
-      return ctx.reply('An error occurred while fetching creator report.', {
-        reply_parameters: {
-          message_id: ctx.message.message_id,
-          chat_id: ctx.message.chat.id,
-        },
+      this.handleCommandError(err, () => {
+        return ctx.reply('An error occurred while fetching creator report.', {
+          reply_parameters: {
+            message_id: ctx.message.message_id,
+            chat_id: ctx.message.chat.id,
+          },
+        });
       });
     }
   }
@@ -567,13 +581,15 @@ export class TelegramCommands extends BaseCommands {
       );
     } catch (err) {
       await loading.stop();
-      this.logger.error('Error generating insiders graph', err);
-      return ctx.reply(
-        'An error occurred while generating the insiders graph.',
-        {
-          reply_parameters: replyParams,
-        },
-      );
+      this.handleCommandError(err, () => {
+        this.logger.error('Error generating insiders graph', err);
+        return ctx.reply(
+          'An error occurred while generating the insiders graph.',
+          {
+            reply_parameters: replyParams,
+          },
+        );
+      });
     }
   }
 
@@ -678,9 +694,11 @@ export class TelegramCommands extends BaseCommands {
       );
     } catch (err) {
       await loading.stop();
-      this.logger.error('Error analyzing network', err);
-      return ctx.reply('An error occurred while analyzing the network.', {
-        reply_parameters: replyParams,
+      this.handleCommandError(err, () => {
+        this.logger.error('Error analyzing network', err);
+        return ctx.reply('An error occurred while analyzing the network.', {
+          reply_parameters: replyParams,
+        });
       });
     }
   }
@@ -709,8 +727,10 @@ export class TelegramCommands extends BaseCommands {
       return ctx.reply(result, { reply_parameters: replyParams });
     } catch (err) {
       this.logger.error('Error watching address', err);
-      return ctx.reply('An error occurred while setting up the watch.', {
-        reply_parameters: replyParams,
+      this.handleCommandError(err, () => {
+        return ctx.reply('An error occurred while setting up the watch.', {
+          reply_parameters: replyParams,
+        });
       });
     }
   }
@@ -739,8 +759,10 @@ export class TelegramCommands extends BaseCommands {
       return ctx.reply(result, { reply_parameters: replyParams });
     } catch (err) {
       this.logger.error('Error unwatching address', err);
-      return ctx.reply('An error occurred while removing the watch.', {
-        reply_parameters: replyParams,
+      this.handleCommandError(err, () => {
+        return ctx.reply('An error occurred while removing the watch.', {
+          reply_parameters: replyParams,
+        });
       });
     }
   }
@@ -769,8 +791,10 @@ export class TelegramCommands extends BaseCommands {
       return ctx.reply(result, { reply_parameters: replyParams });
     } catch (err) {
       this.logger.error('Error watching token', err);
-      return ctx.reply('An error occurred while setting up the watch.', {
-        reply_parameters: replyParams,
+      this.handleCommandError(err, () => {
+        return ctx.reply('An error occurred while setting up the watch.', {
+          reply_parameters: replyParams,
+        });
       });
     }
   }
@@ -799,9 +823,17 @@ export class TelegramCommands extends BaseCommands {
       return ctx.reply(result, { reply_parameters: replyParams });
     } catch (err) {
       this.logger.error('Error unwatching token', err);
-      return ctx.reply('An error occurred while removing the watch.', {
-        reply_parameters: replyParams,
+      this.handleCommandError(err, () => {
+        return ctx.reply('An error occurred while removing the watch.', {
+          reply_parameters: replyParams,
+        });
       });
     }
+  }
+
+  private handleCommandError(err: unknown, cb: () => void) {
+    if ((err as any).message?.includes('message to be replied not found'))
+      return;
+    return cb();
   }
 }
