@@ -1,5 +1,4 @@
 import { EmbedBuilder, escapeMarkdown, Message } from 'discord.js';
-import { CreatorReport } from 'src/common/interfaces/rugcheck';
 import { AiService } from 'src/modules/ai/ai.service';
 import { GraphService } from 'src/modules/graph/graph.service';
 import { ReportService } from 'src/modules/report/report.service';
@@ -9,7 +8,10 @@ import { WatchService } from 'src/modules/watch/watch.service';
 import { SUPPORTED_OHLCV_DURATIONS } from 'src/shared/constants';
 import { isValidSolanaAddress, truncateAddress } from 'src/shared/utils';
 import { BaseCommands } from '../../base/base.commands';
-import { formatRiskReport } from '../handlers/message.handler';
+import {
+  formatCreatorReport,
+  formatRiskReport,
+} from '../handlers/message.handler';
 import { formatTokensList } from '../handlers/tokens-list.handler';
 
 export class DiscordCommands extends BaseCommands {
@@ -252,7 +254,7 @@ export class DiscordCommands extends BaseCommands {
       const holders = nodes
         .filter((n) => n.holdings > 0)
         .sort((a, b) => b.holdings - a.holdings)
-        .slice(0, 10);
+        .slice(0, 7);
 
       if (holders.length > 0) {
         embed.addFields({
@@ -295,7 +297,7 @@ export class DiscordCommands extends BaseCommands {
       }
 
       const report = await this.reportService.getCreatorReport(address);
-      const { embed } = this.formatCreatorReport(address, report);
+      const { embed } = formatCreatorReport(address, report);
       await loading.delete();
       return msg.reply({ embeds: [embed] });
     } catch (err) {
@@ -495,36 +497,5 @@ export class DiscordCommands extends BaseCommands {
       this.logger.error('Error unwatching token', err);
       return loading.edit('An error occurred while removing the watch.');
     }
-  }
-
-  private formatCreatorReport(address: string, report: CreatorReport) {
-    const embed = new EmbedBuilder()
-      .setTitle(`👤 Creator Report: ${address}`)
-      .setDescription(
-        `Total Reports: ${report.totalReports}\nUnique Tokens Reported: ${report.uniqueTokensReported}`,
-      )
-      .setColor(report.totalReports > 0 ? 0xff0000 : 0x00ff00);
-
-    if (report.reports.length > 0) {
-      embed.addFields({
-        name: '🚨 Recent Reports',
-        value: report.reports
-          .slice(0, 5)
-          .map((r) => {
-            const evidenceLink = r.evidence
-              ? `\n[View Evidence](${r.evidence})`
-              : '';
-            return `**Token:** \`${r.mint}\`\n${r.message}${evidenceLink}`;
-          })
-          .join('\n\n'),
-      });
-    } else {
-      embed.addFields({
-        name: '✅ No Reports',
-        value: 'No reports found for this creator',
-      });
-    }
-
-    return { embed };
   }
 }
