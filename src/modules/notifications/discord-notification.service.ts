@@ -44,7 +44,7 @@ export class DiscordNotificationService {
             value: report.message,
           },
           {
-            name: 'Timestamp',
+            name: 'Reported On',
             value: new Date(report.createdAt).toLocaleString(),
             inline: true,
           },

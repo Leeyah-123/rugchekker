@@ -1,5 +1,4 @@
 import { EmbedBuilder, escapeMarkdown, Message } from 'discord.js';
-import { CreatorReport } from 'src/common/interfaces/rugcheck';
 import { AiService } from 'src/modules/ai/ai.service';
 import { GraphService } from 'src/modules/graph/graph.service';
 import { ReportService } from 'src/modules/report/report.service';
@@ -9,7 +8,10 @@ import { WatchService } from 'src/modules/watch/watch.service';
 import { SUPPORTED_OHLCV_DURATIONS } from 'src/shared/constants';
 import { isValidSolanaAddress, truncateAddress } from 'src/shared/utils';
 import { BaseCommands } from '../../base/base.commands';
-import { formatRiskReport } from '../handlers/message.handler';
+import {
+  formatCreatorReport,
+  formatRiskReport,
+} from '../handlers/message.handler';
 import { formatTokensList } from '../handlers/tokens-list.handler';
 
 export class DiscordCommands extends BaseCommands {
@@ -28,8 +30,7 @@ export class DiscordCommands extends BaseCommands {
     const query = msg.content.replace(/^!analyze\s*/, '');
 
     if (!query) {
-      return this.reply(
-        msg.reply.bind(msg),
+      return msg.reply(
         'Invalid command. Usage: !analyze <token>\nExample: !analyze JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
       );
     }
@@ -213,8 +214,7 @@ export class DiscordCommands extends BaseCommands {
       const participantsOnly = parts[1]?.toLowerCase() === 'participants';
 
       if (!mintAddress) {
-        return this.reply(
-          msg.reply.bind(msg),
+        return msg.reply(
           'Invalid command. Usage:\n' +
             '!insiders <token> [participants]\n\n' +
             'Examples:\n' +
@@ -223,21 +223,18 @@ export class DiscordCommands extends BaseCommands {
         );
       }
       if (!isValidSolanaAddress(mintAddress))
-        return this.reply(msg.reply.bind(msg), 'Invalid address provided.');
+        return msg.reply('Invalid address provided.');
 
       const loadingMsg = await msg.reply('Generating insiders graph...');
 
       const graphData =
         await this.rugcheckService.getInsidersGraph(mintAddress);
       if (typeof graphData === 'string') {
-        return this.reply(msg.reply.bind(msg), graphData);
+        return msg.reply(graphData);
       }
 
       if (!graphData || graphData.length === 0) {
-        return this.reply(
-          msg.reply.bind(msg),
-          'No insider data found for this token.',
-        );
+        return msg.reply('No insider data found for this token.');
       }
       const imageBuffer = await this.graphService.generateInsidersGraph(
         graphData as any,
@@ -257,7 +254,7 @@ export class DiscordCommands extends BaseCommands {
       const holders = nodes
         .filter((n) => n.holdings > 0)
         .sort((a, b) => b.holdings - a.holdings)
-        .slice(0, 10);
+        .slice(0, 7);
 
       if (holders.length > 0) {
         embed.addFields({
@@ -280,8 +277,7 @@ export class DiscordCommands extends BaseCommands {
       });
     } catch (err) {
       this.logger.error('Error generating insiders graph', err);
-      return this.reply(
-        msg.reply.bind(msg),
+      return msg.reply(
         'An error occurred while generating the insiders graph.',
       );
     }
@@ -301,7 +297,7 @@ export class DiscordCommands extends BaseCommands {
       }
 
       const report = await this.reportService.getCreatorReport(address);
-      const { embed } = this.formatCreatorReport(address, report);
+      const { embed } = formatCreatorReport(address, report);
       await loading.delete();
       return msg.reply({ embeds: [embed] });
     } catch (err) {
@@ -321,8 +317,7 @@ export class DiscordCommands extends BaseCommands {
           .map(([key, value]) => `${key} (${value})`)
           .join('\n');
 
-        return this.reply(
-          msg.reply.bind(msg),
+        return msg.reply(
           'Invalid command. Usage:\n' +
             '!analyze_network <token> [duration]\n\n' +
             'Examples:\n' +
@@ -334,13 +329,12 @@ export class DiscordCommands extends BaseCommands {
       }
 
       if (!isValidSolanaAddress(mintAddress)) {
-        return this.reply(msg.reply.bind(msg), 'Invalid token address format.');
+        return msg.reply('Invalid token address format.');
       }
 
       // Validate duration
       if (!(duration in SUPPORTED_OHLCV_DURATIONS)) {
-        return this.reply(
-          msg.reply.bind(msg),
+        return msg.reply(
           'Invalid duration specified.\n' +
             'Supported durations:\n' +
             Object.entries(SUPPORTED_OHLCV_DURATIONS)
@@ -361,6 +355,9 @@ export class DiscordCommands extends BaseCommands {
         mintAddress,
         duration as any,
       );
+      if (candlestickData.data.length === 0) {
+        return msg.reply('No candlestick data found for this token.');
+      }
 
       const [aiAnalysis, graphBuffer] = await Promise.all([
         this.aiService.analyzeCandlestickPattern(
@@ -394,10 +391,7 @@ export class DiscordCommands extends BaseCommands {
       });
     } catch (err) {
       this.logger.error('Error analyzing network', err);
-      return this.reply(
-        msg.reply.bind(msg),
-        'An error occurred while analyzing the network.',
-      );
+      return msg.reply('An error occurred while analyzing the network.');
     }
   }
 
@@ -503,40 +497,5 @@ export class DiscordCommands extends BaseCommands {
       this.logger.error('Error unwatching token', err);
       return loading.edit('An error occurred while removing the watch.');
     }
-  }
-
-  private reply(replyFunction: (payload: any) => any, payload: any) {
-    return replyFunction(payload);
-  }
-
-  private formatCreatorReport(address: string, report: CreatorReport) {
-    const embed = new EmbedBuilder()
-      .setTitle(`👤 Creator Report: ${address}`)
-      .setDescription(
-        `Total Reports: ${report.totalReports}\nUnique Tokens Reported: ${report.uniqueTokensReported}`,
-      )
-      .setColor(report.totalReports > 0 ? 0xff0000 : 0x00ff00);
-
-    if (report.reports.length > 0) {
-      embed.addFields({
-        name: '🚨 Recent Reports',
-        value: report.reports
-          .slice(0, 5)
-          .map((r) => {
-            const evidenceLink = r.evidence
-              ? `\n[View Evidence](${r.evidence})`
-              : '';
-            return `**Token:** \`${r.mint}\`\n${r.message}${evidenceLink}`;
-          })
-          .join('\n\n'),
-      });
-    } else {
-      embed.addFields({
-        name: '✅ No Reports',
-        value: 'No reports found for this creator',
-      });
-    }
-
-    return { embed };
   }
 }

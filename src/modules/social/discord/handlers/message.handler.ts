@@ -4,8 +4,10 @@ import {
   ButtonStyle,
   EmbedBuilder,
 } from 'discord.js';
-import { RugCheckTokenReport } from 'src/common/interfaces/rugcheck';
-import { TokenReport } from 'src/schemas/token-report.schema';
+import {
+  CreatorReport,
+  RugCheckTokenReport,
+} from 'src/common/interfaces/rugcheck';
 
 export function formatRiskReport(
   tokenLabel: string,
@@ -118,37 +120,33 @@ export function formatRiskReport(
   return { embed, components: [row] };
 }
 
-export function formatCreatorReport(
-  address: string,
-  report: {
-    reports: TokenReport[];
-    totalReports: number;
-    uniqueTokensReported: number;
-  },
-): { embed: EmbedBuilder } {
+export function formatCreatorReport(address: string, report: CreatorReport) {
   const embed = new EmbedBuilder()
-    .setTitle(`Creator Report: ${address}`)
-    .addFields(
-      {
-        name: '📊 Report Stats',
-        value: `Total Reports: ${report.totalReports}\nUnique Tokens Reported: ${report.uniqueTokensReported}`,
-      },
-      {
-        name: '🚨 Recent Reports',
-        value:
-          report.reports
-            .slice(0, 5)
-            .map(
-              (r) =>
-                `**Token: ${r.mint}**\n${r.message}\nReported: ${new Date(
-                  r.createdAt,
-                ).toLocaleDateString()}`,
-            )
-            .join('\n\n') || 'No reports found',
-      },
+    .setTitle(`👤 Creator Report: ${address}`)
+    .setDescription(
+      `Total Reports: ${report.totalReports}\nUnique Tokens Reported: ${report.uniqueTokensReported}`,
     )
-    .setColor(0xff0000)
-    .setTimestamp();
+    .setColor(report.totalReports > 0 ? 0xff0000 : 0x00ff00);
+
+  if (report.reports.length > 0) {
+    embed.addFields({
+      name: '🚨 Recent Reports',
+      value: report.reports
+        .slice(0, 5)
+        .map((r) => {
+          const evidenceLink = r.evidence
+            ? `\n[View Evidence](${r.evidence})`
+            : '';
+          return `**Token:** \`${r.mint}\`\n${r.message}${evidenceLink}`;
+        })
+        .join('\n\n'),
+    });
+  } else {
+    embed.addFields({
+      name: '✅ No Reports',
+      value: 'No reports found for this creator',
+    });
+  }
 
   return { embed };
 }

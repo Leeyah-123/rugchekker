@@ -10,6 +10,7 @@ import {
   TrendingToken,
   VerifiedToken,
 } from 'src/common/interfaces/rugcheck';
+import { truncateAddress } from 'src/shared/utils';
 
 type TokenListType =
   | TokenStat[]
@@ -22,19 +23,20 @@ function formatTokenDescription(
 ): string {
   if ('createAt' in token) {
     // TokenStat
-    return `**${token.symbol}**\nMint: \`${token.mint}\`\nCreated: ${new Date(token.createAt).toLocaleString()}`;
+    return `**${token.symbol}**\nMint: [${truncateAddress(token.mint)}](https://solscan\.io/token/${token.mint})\nCreated: ${new Date(token.createAt).toLocaleString()}`;
   } else if ('metadata' in token) {
     // RecentToken
-    return `**${token.metadata.symbol}**\nMint: \`${token.mint}\`\nVisits: ${token.visits}\nScore: ${token.score}`;
+    return `**${token.metadata.symbol}**\nMint: [${truncateAddress(token.mint)}](https://solscan.io/token/${token.mint})\nVisits: ${token.visits}\nScore: ${token.score}`;
   } else if ('up_count' in token) {
     // TrendingToken
-    return `**Token**\nMint: \`${token.mint}\`\nUpvotes: ${token.up_count}\nTotal Votes: ${token.vote_count}`;
+    return `**Token**\nMint: [${truncateAddress(token.mint)}](https://solscan.io/token/${token.mint})\nUpvotes: ${token.up_count}\nTotal Votes: ${token.vote_count}`;
   } else {
     // VerifiedToken
-    const links = token.links
-      .map((link) => `[${link.provider}](${link.value})`)
-      .join(', ');
-    return `**${token.symbol}**\nMint: \`${token.mint}\`\n${token.jup_verified ? '✅ Verified' : '❌ Unverified'}${links ? `\nLinks: ${links}` : ''}`;
+    const links =
+      token.links &&
+      token.links.length &&
+      token.links.map((link) => `[${link.provider}](${link.value})`).join(', ');
+    return `**${token.symbol}**\nMint: [${truncateAddress(token.mint)}](https://solscan.io/token/${token.mint})\n${token.jup_verified ? '✅ Verified' : '❌ Unverified'}${links ? `\nLinks: ${links}` : ''}`;
   }
 }
 
@@ -65,7 +67,7 @@ export function formatTokensList(
           `Analyze ${
             ('symbol' in token && token.symbol) ||
             ('metadata' in token && token.metadata.symbol) ||
-            `${token.mint.slice(0, 6)}...`
+            `${truncateAddress(token.mint)}`
           }`,
         )
         .setStyle(ButtonStyle.Primary)
@@ -76,7 +78,7 @@ export function formatTokensList(
           `Report ${
             ('symbol' in token && token.symbol) ||
             ('metadata' in token && token.metadata.symbol) ||
-            `${token.mint.slice(0, 6)}...`
+            `${truncateAddress(token.mint)}`
           }`,
         )
         .setStyle(ButtonStyle.Danger)

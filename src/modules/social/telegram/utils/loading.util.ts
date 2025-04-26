@@ -11,6 +11,8 @@ export class LoadingMessage {
   constructor(private readonly ctx: Context) {}
 
   async start(text: string): Promise<void> {
+    if (!this.ctx.message) return;
+
     this.baseText = text;
     this.message = await this.ctx.reply(this.baseText, {
       reply_parameters: {
@@ -48,6 +50,8 @@ export class LoadingMessage {
   }
 
   async stop(): Promise<void> {
+    if (!this.ctx.message) return;
+
     if (this.interval) {
       clearInterval(this.interval);
     }
