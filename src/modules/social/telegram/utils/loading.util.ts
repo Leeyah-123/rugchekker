@@ -38,7 +38,8 @@ export class LoadingMessage {
         if (
           !error.message?.includes('message is not modified') &&
           !error.message?.includes('message to edit not found') &&
-          !error.message?.includes('MESSAGE_ID_INVALID')
+          !error.message?.includes('MESSAGE_ID_INVALID') &&
+          !error.message?.includes('message to be replied not found')
         ) {
           this.logger.error('Error updating loading message:', error);
         }
